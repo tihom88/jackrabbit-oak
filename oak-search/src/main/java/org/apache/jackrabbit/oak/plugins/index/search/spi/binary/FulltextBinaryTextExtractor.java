@@ -136,7 +136,7 @@ public class FulltextBinaryTextExtractor {
       text = parseStringValue0(v, metadata, path);
       if (textExtractionTimerMetricStats != null) {
         TimerStats.Context context = textExtractionTimerMetricStats.time();
-        context.s top();
+        context.stop();
       }
     }
     return text;
