@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.Lists;
@@ -40,6 +41,9 @@ import org.apache.jackrabbit.oak.plugins.index.search.ExtractedTextCache;
 import org.apache.jackrabbit.oak.plugins.index.search.IndexDefinition;
 import org.apache.jackrabbit.oak.plugins.index.search.spi.editor.FulltextIndexEditorContext;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
+import org.apache.jackrabbit.oak.spi.whiteboard.Whiteboard;
+import org.apache.jackrabbit.oak.stats.StatsOptions;
+import org.apache.jackrabbit.oak.stats.TimerStats;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
@@ -60,6 +64,7 @@ import static org.apache.jackrabbit.oak.plugins.index.search.spi.editor.Fulltext
  *
  */
 public class FulltextBinaryTextExtractor {
+  private final static String TEXT_EXTRACTION_TIMER_METRIC_NAME = "TEXT_EXTRACTION_TIME";
 
   private static final Logger log = LoggerFactory.getLogger(FulltextBinaryTextExtractor.class);
   private static final Parser defaultParser = createDefaultParser();
@@ -70,6 +75,7 @@ public class FulltextBinaryTextExtractor {
   private final boolean reindex;
   private Parser parser;
   private TikaConfigHolder tikaConfig;
+  private TimerStats textExtractionTimerMetricStats;
   /**
    * The media types supported by the parser used.
    */
@@ -125,7 +131,16 @@ public class FulltextBinaryTextExtractor {
   private String parseStringValue(Blob v, Metadata metadata, String path, String propertyName) {
     String text = extractedTextCache.get(path, propertyName, v, reindex);
     if (text == null){
-      text = parseStringValue0(v, metadata, path);
+      if (extractedTextCache.getStatisticsProvider() != null) {
+        textExtractionTimerMetricStats = extractedTextCache.getStatisticsProvider().
+                getTimer(TEXT_EXTRACTION_TIMER_METRIC_NAME, StatsOptions.METRICS_ONLY);
+        TimerStats.Context context = textExtractionTimerMetricStats.time();
+        text = parseStringValue0(v, metadata, path);
+        context.stop();
+      }
+      else {
+        text = parseStringValue0(v, metadata, path);
+      }
     }
     return text;
   }
