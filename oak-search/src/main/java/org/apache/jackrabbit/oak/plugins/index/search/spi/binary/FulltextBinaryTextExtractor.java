@@ -64,6 +64,7 @@ import static org.apache.jackrabbit.oak.plugins.index.search.spi.editor.Fulltext
  *
  */
 public class FulltextBinaryTextExtractor {
+  private final static String TEXT_EXTRACTION_TIMER_METRIC_NAME = "TEXT_EXTRACTION_TIME";
 
   private static final Logger log = LoggerFactory.getLogger(FulltextBinaryTextExtractor.class);
   private static final Parser defaultParser = createDefaultParser();
@@ -75,7 +76,6 @@ public class FulltextBinaryTextExtractor {
   private Parser parser;
   private TikaConfigHolder tikaConfig;
   private TimerStats textExtractionTimerMetricStats;
-  private final static String TEXT_EXTRACTION_TIMER_METRIC_NAME = "TEXT_EXTRACTION_TIME";
   /**
    * The media types supported by the parser used.
    */
@@ -131,12 +131,15 @@ public class FulltextBinaryTextExtractor {
   private String parseStringValue(Blob v, Metadata metadata, String path, String propertyName) {
     String text = extractedTextCache.get(path, propertyName, v, reindex);
     if (text == null){
-      textExtractionTimerMetricStats = (extractedTextCache.getStatisticsProvider() != null) ? extractedTextCache.getStatisticsProvider().
-              getTimer(TEXT_EXTRACTION_TIMER_METRIC_NAME, StatsOptions.METRICS_ONLY) : null;
-      text = parseStringValue0(v, metadata, path);
-      if (textExtractionTimerMetricStats != null) {
+      if (extractedTextCache.getStatisticsProvider() != null) {
+        textExtractionTimerMetricStats = extractedTextCache.getStatisticsProvider().
+                getTimer(TEXT_EXTRACTION_TIMER_METRIC_NAME, StatsOptions.METRICS_ONLY);
         TimerStats.Context context = textExtractionTimerMetricStats.time();
+        text = parseStringValue0(v, metadata, path);
         context.stop();
+      }
+      else {
+        text = parseStringValue0(v, metadata, path);
       }
     }
     return text;

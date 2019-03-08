@@ -80,7 +80,7 @@ public class ExtractedTextCache {
     private long totalTextSize;
     private long totalTime;
     private int preFetchedCount;
-    private StatisticsProvider statisticsProvider;
+    private final StatisticsProvider statisticsProvider;
 
     // the actual cache. key: content id, value: extracted text
     private final Cache<String, String> cache;
@@ -99,6 +99,11 @@ public class ExtractedTextCache {
 
     public ExtractedTextCache(long maxWeight, long expiryTimeInSecs, boolean alwaysUsePreExtractedCache,
                               File indexDir) {
+        this(maxWeight, expiryTimeInSecs, alwaysUsePreExtractedCache, indexDir, null);
+    }
+
+    public ExtractedTextCache(long maxWeight, long expiryTimeInSecs, boolean alwaysUsePreExtractedCache,
+                              File indexDir, StatisticsProvider statisticsProvider) {
         if (maxWeight > 0) {
             cache = CacheBuilder.newBuilder()
                     .weigher(EmpiricalWeigher.INSTANCE)
@@ -116,11 +121,6 @@ public class ExtractedTextCache {
         this.timeoutMap = new ConcurrentHashMap<>();
         this.indexDir = indexDir;
         loadTimeoutMap();
-    }
-
-    public ExtractedTextCache(long maxWeight, long expiryTimeInSecs, boolean alwaysUsePreExtractedCache,
-                              File indexDir, StatisticsProvider statisticsProvider) {
-        this(maxWeight, expiryTimeInSecs, alwaysUsePreExtractedCache, indexDir);
         this.statisticsProvider = statisticsProvider;
     }
 
