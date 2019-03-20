@@ -33,6 +33,10 @@ import javax.management.openmbean.TabularType;
 import org.apache.jackrabbit.oak.commons.jmx.AnnotatedStandardMBean;
 import org.apache.jackrabbit.oak.query.QueryEngineSettings;
 import org.apache.jackrabbit.oak.query.stats.QueryStatsData.QueryExecutionStats;
+import org.apache.jackrabbit.oak.stats.HistogramStats;
+import org.apache.jackrabbit.oak.stats.CounterStats;
+import org.apache.jackrabbit.oak.stats.StatisticsProvider;
+import org.apache.jackrabbit.oak.stats.StatsOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +50,21 @@ public class QueryStatsMBeanImpl extends AnnotatedStandardMBean
             Integer.getInteger("oak.query.stats", 5000);
     private final int MAX_POPULAR_QUERIES = 
             Integer.getInteger("oak.query.slowLimit", 100);
+    private final long SLOW_QUERY_HISTOGRAM = 1;
+    private final long NORMAL_QUERY_HISTOGRAM = 0;
+    private final String SLOW_QUERY_PERCENTILE_METRICS_NAME = "SLOW_QUERY_PERCENTILE_METRICS";
+    private final String SLOW_QUERY_COUNT_NAME = "SLOW_QUERY_COUNT";
     private final ConcurrentSkipListMap<String, QueryStatsData> statistics = 
             new ConcurrentSkipListMap<String, QueryStatsData>();
     private final QueryEngineSettings settings;
     private boolean captureStackTraces;
     private int evictionCount;
+    private final StatisticsProvider statisticsProvider;
 
     public QueryStatsMBeanImpl(QueryEngineSettings settings) {
         super(QueryStatsMBean.class);
         this.settings = settings;
+        this.statisticsProvider = settings.getStatisticsProvider();
     }
     
     @Override
@@ -140,6 +150,15 @@ public class QueryStatsMBeanImpl extends AnnotatedStandardMBean
             stats = s2;
         }
         stats.setCaptureStackTraces(captureStackTraces);
+        long maxScanned = Math.min(SLOW_QUERY_LIMIT_SCANNED, settings.getLimitReads());
+        HistogramStats histogramStats = statisticsProvider.getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
+        if (stats.getMaxRowsScanned() > maxScanned) {
+            histogramStats.update(SLOW_QUERY_HISTOGRAM);
+            CounterStats slowQueryCounter = statisticsProvider.getCounterStats(SLOW_QUERY_COUNT_NAME, StatsOptions.METRICS_ONLY);
+            slowQueryCounter.inc();
+        } else {
+            histogramStats.update(NORMAL_QUERY_HISTOGRAM);
+        }
         return stats.new QueryExecutionStats();
     }
 
