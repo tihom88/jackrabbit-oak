@@ -59,7 +59,7 @@ public class Statement {
     QueryOptions queryOptions;
     
     public Statement optimize() {
-        ignoreOrderByScoreDesc();
+        ignoreOrderByScoreDesc(orderList);
         if (where == null) {
             return this;
         }
@@ -97,7 +97,7 @@ public class Statement {
 
         return union;
     }
-    
+
     private ArrayList<Selector> cloneSelectors() {
         ArrayList<Selector> list = new ArrayList<Selector>();
         for (Selector s : selectors) {
@@ -231,8 +231,8 @@ public class Statement {
         appendXPathAsComment(buff, xpathQuery);
         return buff.toString();        
     }
-    
-    private void ignoreOrderByScoreDesc() {
+
+    private static void ignoreOrderByScoreDesc(ArrayList<Order> orderList) {
         if (orderList.size() != 1) {
             return;
         }
@@ -243,7 +243,7 @@ public class Statement {
         if (!order.expr.toString().equals("[jcr:score]")) {
             return;
         }
-        // so we have just one expression, 
+        // so we have just one expression,
         // and it is "order by @jcr:score desc"
         // this we can remove
         orderList.remove(0);
@@ -295,6 +295,7 @@ public class Statement {
         
         @Override
         public Statement optimize() {
+            ignoreOrderByScoreDesc(orderList);
             Statement s1b = s1.optimize();
             Statement s2b = s2.optimize();
             if (s1 == s1b && s2 == s2b) {
@@ -309,7 +310,7 @@ public class Statement {
             union.xpathQuery = xpathQuery;
             return union;
         }
-        
+
         @Override
         public String toString() {
             StringBuilder buff = new StringBuilder();
