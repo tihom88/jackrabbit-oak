@@ -59,12 +59,10 @@ public class QueryStatsMBeanImpl extends AnnotatedStandardMBean
     private final QueryEngineSettings settings;
     private boolean captureStackTraces;
     private int evictionCount;
-    private final StatisticsProvider statisticsProvider;
 
     public QueryStatsMBeanImpl(QueryEngineSettings settings) {
         super(QueryStatsMBean.class);
         this.settings = settings;
-        this.statisticsProvider = settings.getStatisticsProvider();
     }
     
     @Override
@@ -151,10 +149,10 @@ public class QueryStatsMBeanImpl extends AnnotatedStandardMBean
         }
         stats.setCaptureStackTraces(captureStackTraces);
         long maxScanned = Math.min(SLOW_QUERY_LIMIT_SCANNED, settings.getLimitReads());
-        HistogramStats histogramStats = statisticsProvider.getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
+        HistogramStats histogramStats = settings.getStatisticsProvider().getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
         if (stats.getMaxRowsScanned() > maxScanned) {
             histogramStats.update(SLOW_QUERY_HISTOGRAM);
-            CounterStats slowQueryCounter = statisticsProvider.getCounterStats(SLOW_QUERY_COUNT_NAME, StatsOptions.METRICS_ONLY);
+            CounterStats slowQueryCounter = settings.getStatisticsProvider().getCounterStats(SLOW_QUERY_COUNT_NAME, StatsOptions.METRICS_ONLY);
             slowQueryCounter.inc();
         } else {
             histogramStats.update(NORMAL_QUERY_HISTOGRAM);
