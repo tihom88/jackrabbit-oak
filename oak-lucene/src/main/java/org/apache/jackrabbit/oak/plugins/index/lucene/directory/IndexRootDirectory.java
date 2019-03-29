@@ -126,22 +126,13 @@ public class IndexRootDirectory {
         }
     }
 
-    private int totalLocalIndexes(Map<String, List<LocalIndexDir>> mapping){
-        int size = 0;
-        for ( Map.Entry<String, List<LocalIndexDir>> e : mapping.entrySet()) {
-            size += e.getValue().size();
-        }
-        return size;
-    }
-
     /**
      * Returns the most recent directory for each index. If for an index 2 versions are present
      * then it would return the most recent version
      */
     public List<LocalIndexDir> getAllLocalIndexes() throws IOException {
         Map<String, List<LocalIndexDir>> mapping = getIndexesPerPath();
-        int totalLocalIndexes =  totalLocalIndexes(mapping);
-        List<LocalIndexDir> result = Lists.newArrayListWithCapacity(totalLocalIndexes);
+        List<LocalIndexDir> result = new ArrayList<>();
         for (Map.Entry<String, List<LocalIndexDir>> e : mapping.entrySet()){
             result.addAll(e.getValue());
         }
