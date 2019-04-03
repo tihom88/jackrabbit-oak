@@ -216,7 +216,7 @@ public class FulltextIndexPlanner {
 
                     PropertyDefinition facetPropDef = indexingRule.getConfig(facetProp);
                     if (facetPropDef == null || !facetPropDef.facet) {
-                        log.warn("{} not backed by index. Opting out", value);
+                        log.debug("{} not backed by index. Opting out", value);
                         return null;
                     }
 
