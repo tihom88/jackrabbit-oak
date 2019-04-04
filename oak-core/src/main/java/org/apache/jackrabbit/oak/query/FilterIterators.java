@@ -65,7 +65,7 @@ public class FilterIterators {
     public static void checkReadLimit(long count, QueryLimits settings) {
         long maxReadEntries = settings.getLimitReads();
         if (count > maxReadEntries) {
-            String message = "The query read or traversed more than " + 
+            String message = "The query read or traversed more than " +
                     maxReadEntries + " nodes.";
             UnsupportedOperationException e = new UnsupportedOperationException(
                     message + 
