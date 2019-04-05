@@ -183,20 +183,18 @@ public class QueryStatsData {
             maxTimeNanos = Math.max(maxTimeNanos, time);
         }
 
-        public void scan(long count, long max) {
+        public void scan(long count, long max, QueryEngineSettings queryEngineSettings) {
             totalRowsScanned += count;
             maxRowsScanned = Math.max(maxRowsScanned, max);
-        }
-        public void scan(long count, long max, QueryEngineSettings queryEngineSettings) {
-            scan(count, max);
             long maxScannedLimit = Math.min(SLOW_QUERY_LIMIT_SCANNED, queryEngineSettings.getLimitReads());
-            HistogramStats histogramStats = queryEngineSettings.getStatisticsProvider().getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
             if (updateTotalQueryHistogram) {
                 updateTotalQueryHistogram = false;
+                HistogramStats histogramStats = queryEngineSettings.getStatisticsProvider().getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
                 histogramStats.update(TOTAL_QUERY_HISTOGRAM);
             }
             if (totalRowsScanned >= maxScannedLimit && !isSlowQuery) {
                 isSlowQuery = true;
+                HistogramStats histogramStats = queryEngineSettings.getStatisticsProvider().getHistogram(SLOW_QUERY_PERCENTILE_METRICS_NAME, StatsOptions.METRICS_ONLY);
                 histogramStats.update(SLOW_QUERY_HISTOGRAM);
                 CounterStats slowQueryCounter = queryEngineSettings.getStatisticsProvider().getCounterStats(SLOW_QUERY_COUNT_NAME, StatsOptions.METRICS_ONLY);
                 slowQueryCounter.inc();
