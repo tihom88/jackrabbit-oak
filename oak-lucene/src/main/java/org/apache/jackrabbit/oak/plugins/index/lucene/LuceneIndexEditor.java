@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.jackrabbit.oak.commons.PathUtils.concat;
+import static org.apache.jackrabbit.oak.commons.PathUtils.getParentPath;
 
 /**
  * {@link IndexEditor} implementation that is responsible for keeping the
@@ -267,6 +268,10 @@ public class LuceneIndexEditor implements IndexEditor, Aggregate.AggregateRoot {
             throw ce;
         } catch (IllegalArgumentException ie) {
             log.warn("Failed to index the node [{}]", path, ie);
+        } catch (RuntimeException re) {
+            log.warn("Failed to index the node [{}]", path, re);
+            context.getIndexingContext().indexUpdateFailed(re);
+            throw re;
         }
         return false;
     }
