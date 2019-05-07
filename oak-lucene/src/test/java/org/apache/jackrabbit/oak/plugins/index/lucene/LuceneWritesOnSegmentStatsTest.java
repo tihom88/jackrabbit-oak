@@ -84,6 +84,9 @@ public class LuceneWritesOnSegmentStatsTest {
 
     private static final File DIRECTORY = new File("target/fs");
     private static final String FOO_QUERY = "select [jcr:path] from [nt:base] where contains('foo', '*')";
+    private final long CORRUPT_INTERVAL = 2;
+    private long ERROR_WARN_INTERVAL = 1;
+
 
     private final boolean copyOnRW;
     private final String codec;
@@ -200,8 +203,8 @@ public class LuceneWritesOnSegmentStatsTest {
 
         asyncIndexUpdate = new AsyncIndexUpdate("async", nodeStore, editorProvider);
         TrackingCorruptIndexHandler trackingCorruptIndexHandler = new TrackingCorruptIndexHandler();
-        trackingCorruptIndexHandler.setCorruptInterval(2, TimeUnit.SECONDS);
-        trackingCorruptIndexHandler.setErrorWarnInterval(1, TimeUnit.SECONDS);
+        trackingCorruptIndexHandler.setCorruptInterval(CORRUPT_INTERVAL, TimeUnit.SECONDS);
+        trackingCorruptIndexHandler.setErrorWarnInterval(ERROR_WARN_INTERVAL, TimeUnit.SECONDS);
         asyncIndexUpdate.setCorruptIndexHandler(trackingCorruptIndexHandler);
         return new Oak(nodeStore)
                 .with(new InitialContent())
