@@ -29,19 +29,21 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.jackrabbit.core.data.FileDataStore;
 import org.apache.jackrabbit.oak.InitialContent;
 import org.apache.jackrabbit.oak.Oak;
-import org.apache.jackrabbit.oak.api.ContentRepository;
-import org.apache.jackrabbit.oak.api.Tree;
+import org.apache.jackrabbit.oak.api.*;
 import org.apache.jackrabbit.oak.commons.IOUtils;
 import org.apache.jackrabbit.oak.commons.concurrent.ExecutorCloser;
 import org.apache.jackrabbit.oak.plugins.blob.BlobStoreStats;
 import org.apache.jackrabbit.oak.plugins.blob.datastore.DataStoreBlobStore;
 import org.apache.jackrabbit.oak.plugins.blob.datastore.OakFileDataStore;
+import org.apache.jackrabbit.oak.plugins.index.AsyncIndexUpdate;
+import org.apache.jackrabbit.oak.plugins.index.TrackingCorruptIndexHandler;
 import org.apache.jackrabbit.oak.plugins.index.lucene.directory.CopyOnReadDirectory;
 import org.apache.jackrabbit.oak.plugins.index.lucene.util.IndexDefinitionBuilder;
 import org.apache.jackrabbit.oak.plugins.index.nodetype.NodeTypeIndexProvider;
@@ -49,6 +51,7 @@ import org.apache.jackrabbit.oak.plugins.index.property.PropertyIndexEditorProvi
 import org.apache.jackrabbit.oak.plugins.index.search.ExtractedTextCache;
 import org.apache.jackrabbit.oak.plugins.index.search.IndexDefinition;
 import org.apache.jackrabbit.oak.query.AbstractQueryTest;
+import org.apache.jackrabbit.oak.query.QueryEngineImpl;
 import org.apache.jackrabbit.oak.segment.SegmentNodeStoreBuilders;
 import org.apache.jackrabbit.oak.segment.file.FileStore;
 import org.apache.jackrabbit.oak.segment.file.FileStoreBuilder;
@@ -65,34 +68,40 @@ import org.apache.jackrabbit.oak.stats.StatisticsProvider;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FilterDirectory;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
- * Tests for checking impacts of Lucene writes wrt storage / configuration adjustments on the
+ * Tests marking index as corrupt if blob is missing.
  * {@link org.apache.jackrabbit.oak.segment.SegmentNodeStore}.
  */
-@Ignore("this is meant to be a benchmark, it shouldn't be part of everyday builds")
 @RunWith(Parameterized.class)
-public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
+public class LuceneWritesOnSegmentStatsTest {
 
     private static final File DIRECTORY = new File("target/fs");
     private static final String FOO_QUERY = "select [jcr:path] from [nt:base] where contains('foo', '*')";
+    private final long CORRUPT_INTERVAL = 2;
+    private long ERROR_WARN_INTERVAL = 1;
+
 
     private final boolean copyOnRW;
     private final String codec;
     private final boolean indexOnFS;
     private final int minRecordLength;
     private final String mergePolicy;
+    protected ContentSession session;
+    protected Root root;
+
+    @Before
+    public void before() throws Exception {
+        session = createRepository().login(null, null);
+        root = session.getLatestRoot();
+    }
+
 
     private ExecutorService executorService = Executors.newFixedThreadPool(2);
 
@@ -111,6 +120,8 @@ public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
     private DefaultStatisticsProvider statisticsProvider;
     private String fdsDir;
     private String indexPath;
+    private AsyncIndexUpdate asyncIndexUpdate;
+
 
 
     public LuceneWritesOnSegmentStatsTest(boolean copyOnRW, String codec, boolean indexOnFS, int minRecordLength, String mergePolicy) {
@@ -166,12 +177,6 @@ public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
         }
     }
 
-    @Override
-    protected void createTestIndexNode() throws Exception {
-        setTraversalEnabled(false);
-    }
-
-    @Override
     protected ContentRepository createRepository() {
         LuceneIndexEditorProvider editorProvider;
         LuceneIndexProvider provider;
@@ -195,6 +200,12 @@ public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
         } catch (IOException | InvalidFileStoreVersionException e) {
             throw new RuntimeException(e);
         }
+
+        asyncIndexUpdate = new AsyncIndexUpdate("async", nodeStore, editorProvider);
+        TrackingCorruptIndexHandler trackingCorruptIndexHandler = new TrackingCorruptIndexHandler();
+        trackingCorruptIndexHandler.setCorruptInterval(CORRUPT_INTERVAL, TimeUnit.SECONDS);
+        trackingCorruptIndexHandler.setErrorWarnInterval(ERROR_WARN_INTERVAL, TimeUnit.SECONDS);
+        asyncIndexUpdate.setCorruptIndexHandler(trackingCorruptIndexHandler);
         return new Oak(nodeStore)
                 .with(new InitialContent())
                 .with(new OpenSecurityProvider())
@@ -273,9 +284,50 @@ public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
         scheduledExecutorService.shutdown();
     }
 
+    void deleteBlobs (String path){
+        File file = new File(path);
+        while (file.listFiles().length > 0) {
+            File folder = file.listFiles()[0];
+            try {
+                FileUtils.deleteDirectory(folder);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+//            recursiveDelete(folder);
+        }
+    }
+
+
+    public static void recursiveDelete(File file) {
+//public static void recursiveDelete(String path) {
+        //File file = new File(path);
+        //to end the recursive loop
+        if (!file.exists())
+            return;
+
+        //if directory, go inside and call recursively
+        if (file.isDirectory()) {
+            for (File f : file.listFiles()) {
+                //call recursively
+                recursiveDelete(f);
+            }
+        }
+        //call delete to delete files and empty directory
+        file.delete();
+        //  System.out.println("Deleted file/folder: "+file.getAbsolutePath());
+    }
+
+    volatile boolean stopContentCreator = false;
     @Test
     public void testLuceneIndexSegmentStats() throws Exception {
-        IndexDefinitionBuilder idxb = new IndexDefinitionBuilder().noAsync().codec(codec).mergePolicy(mergePolicy);
+        root.commit();
+        root.getTree("/oak:index/counter").remove();
+        root.commit();
+
+        IndexDefinitionBuilder idxb = new IndexDefinitionBuilder()
+        //.noAsync()
+        .codec(codec)
+        .mergePolicy(mergePolicy);
         idxb.indexRule("nt:base").property("foo").analyzed().nodeScopeIndex().ordered().useInExcerpt().propertyIndex();
         idxb.indexRule("nt:base").property("bin").analyzed().nodeScopeIndex().ordered().useInExcerpt().propertyIndex();
         Tree idx = root.getTree("/").getChild("oak:index").addChild("lucenePropertyIndex");
@@ -293,97 +345,99 @@ public class LuceneWritesOnSegmentStatsTest extends AbstractQueryTest {
         System.out.println(codec + "," + copyOnRW + "," + indexOnFS + "," + minRecordLength + "," + mergePolicy);
 
         long start = System.currentTimeMillis();
-        int multiplier = 5;
-        for (int n = 0; n < multiplier; n++) {
-            System.err.println("iteration " + (n + 1));
+        int multiplier = 1; ///////////////////////////
+  //      for (int n = 0; n < multiplier; n++) {
+           // System.err.println("iteration " + (n + 1));
 
             Tree rootTree = root.getTree("/").addChild("content");
-            byte[] bytes = new byte[10240];
-            Charset charset = Charset.defaultCharset();
-            String text = "";
-            for (int i = 0; i < 1000; i++) {
-                r.nextBytes(bytes);
-                text = new String(bytes, charset);
-                Tree tree = rootTree.addChild(String.valueOf(n + i));
-                tree.setProperty("foo", text);
-                tree.setProperty("bin", bytes);
+//            byte[] bytes = new byte[10240];
+//            Charset charset = Charset.defaultCharset();
+//            String text = "";
+//            for (int i = 0; i < 1000; i++) {
+//                r.nextBytes(bytes);
+//                text = new String(bytes, charset);
+//                Tree tree = rootTree.addChild(String.valueOf(n + i));
+//                tree.setProperty("foo", text);
+//               // tree.setProperty("bin", bytes);
+//            }
+
+            ContentCreator contentCreator = new ContentCreator();
+            contentCreator.run();
+            root.commit();
+            asyncIndexUpdate.run();
+
+
+            ScheduledExecutorService executorService = Executors
+                .newSingleThreadScheduledExecutor();
+            executorService.scheduleAtFixedRate(contentCreator, 0, 50, TimeUnit.MILLISECONDS);
+
+            Thread.sleep(2000);
+            stopContentCreator = true;
+            Thread.sleep(2000);
+            deleteBlobs(fdsDir);
+            try {
+                asyncIndexUpdate.run();
+                assertFalse(null != root.getTree("/oak:index/lucenePropertyIndex").getProperty("corrupt"));
+                Thread.sleep(800);
+            } catch (RuntimeException e) {
+ //               System.out.println(e);
+                System.out.println("runtimeexp");
+
+            } catch (Exception e ){
+                System.out.println(e);
             }
-            root.commit();
+            asyncIndexUpdate.run();
+            Thread.sleep(800);
+            asyncIndexUpdate.run();
+            assertFalse(null != root.getTree("/oak:index/lucenePropertyIndex").getProperty("corrupt"));
+            Thread.sleep(800);
+            System.out.println("stop");
+            asyncIndexUpdate.run();
+            Thread.sleep(800);
+            assertTrue(null != root.getTree("/oak:index/lucenePropertyIndex").getProperty("corrupt"));
 
-            printStats();
+  //      }
+    }
 
-            System.out.println("reindex");
-
-            // do nothing, reindex and measure
-            idx = root.getTree("/oak:index/lucenePropertyIndex");
-            idx.setProperty("reindex", true);
-            root.commit();
-
-            printStats();
-
-            System.out.println("add and delete");
-
-            // add and delete some content and measure
-            for (int i = 0; i < 1000; i++) {
-                r.nextBytes(bytes);
-                text = new String(bytes, charset);
-                Tree tree = rootTree.addChild(String.valueOf(n + 100 + i));
-                tree.setProperty("foo", text);
-                tree.setProperty("bin", bytes);
-                if (n + i % 3 == 0) { // delete one of the already existing nodes every 3
-                    assert rootTree.getChild(String.valueOf(n + i)).remove();
+    private class ContentCreator implements Runnable {
+        private static final String ALPHA_NUMERIC_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+        public String randomAlphaNumeric(int count) {
+            StringBuilder builder = new StringBuilder();
+            while (count-- != 0) {
+                int character = (int)(Math.random()*ALPHA_NUMERIC_STRING.length());
+                builder.append(ALPHA_NUMERIC_STRING.charAt(character));
+                if (count%10 == 0){
+                    builder.append(" ");
                 }
             }
-            root.commit();
-
-            printStats();
-        }
-        long time = System.currentTimeMillis() - start;
-        System.out.println("finished in " + (time / (60000)) + " minutes");
-        System.out.println("***");
-    }
-
-    private double evaluateQuery(String fooQuery) {
-        long q1Start = System.currentTimeMillis();
-        List<String> res1 = executeQuery(fooQuery, SQL2);
-        long q1End = System.currentTimeMillis();
-        double time =  (q1End - q1Start) / 1000d;
-        assertNotNull(res1);
-        assertTrue(res1.size() > 0);
-        return time;
-    }
-
-    private void printStats() throws IOException {
-        fileStore.flush();
-
-        FileStoreStats stats = fileStore.getStats();
-
-        long sizeOfDirectory = FileUtils.sizeOfDirectory(new File(fdsDir));
-        String fdsSize = (sizeOfDirectory / (1024 * 1000)) + " MB";
-
-        double time = evaluateQuery(FOO_QUERY);
-
-        System.err.println("||codec||min record length||merge policy||segment size||FDS size||query time||");
-        System.err.println("|" + codec + "|" + minRecordLength + "|" + mergePolicy + "|" + IOUtils.humanReadableByteCount(
-                stats.getApproximateSize()) + "|" + fdsSize + "|" + time + " s|");
-
-        if (indexOnFS) {
-            long sizeOfFSIndex = FileUtils.sizeOfDirectory(new File(indexPath));
-            System.out.println("Index on FS size : " + FileUtils.byteCountToDisplaySize(sizeOfFSIndex));
-        }
-    }
-
-    private long dumpFileStoreTo(File to) throws IOException {
-        if (!to.exists()) {
-            assert to.mkdirs();
-        }
-        for (File f : DIRECTORY.listFiles()) {
-            Files.copy(f, new File(to.getPath(), f.getName()));
+            return builder.toString();
         }
 
-        long sizeOfDirectory = FileUtils.sizeOfDirectory(to);
+        volatile boolean dataFlushed = false;
+        public void run(){
+        if (!stopContentCreator && !dataFlushed){
+            Tree rootTree = root.getTree("/content");
+            for (int i = 0; i < 1000; i++) {
+                String text = randomAlphaNumeric(10000);
+                Tree tree = rootTree.addChild(String.valueOf(randomAlphaNumeric(8).trim() + i));
+                tree.setProperty("foo", text);
+                //tree.setProperty("bin", bytes);
+            }
 
-        to.deleteOnExit();
-        return sizeOfDirectory;
+        } else {
+            try {
+                try {
+                    root.commit();
+                } catch (Exception e){
+
+                }
+                fileStore.flush();
+            } catch (IOException e){
+                System.out.println(e);
+            }
+            dataFlushed = true;
+        }
+
+        }
     }
 }
