@@ -29,16 +29,16 @@ import org.apache.jackrabbit.oak.stats.StatisticsProvider;
  * Settings of the query engine.
  */
 public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimits {
-    
+
     /**
      * the flag used to turn on/off the optimisations on top of the {@code org.apache.jackrabbit.oak.query.Query} object.
      * {@code -Doak.query.sql2optimisation}
      */
     public static final String SQL2_OPTIMISATION_FLAG = "oak.query.sql2optimisation";
-    
+
     public static final String SQL2_OPTIMISATION_FLAG_2 = "oak.query.sql2optimisation2";
-    
-    public static final boolean SQL2_OPTIMIZATION_2 = 
+
+    public static final boolean SQL2_OPTIMIZATION_2 =
             Boolean.parseBoolean(System.getProperty(SQL2_OPTIMISATION_FLAG_2, "true"));
 
     public static final String OAK_QUERY_LIMIT_IN_MEMORY = "oak.queryLimitInMemory";
@@ -59,24 +59,24 @@ public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimit
 
     private static final boolean DEFAULT_FULL_TEXT_COMPARISON_WITHOUT_INDEX =
             Boolean.getBoolean("oak.queryFullTextComparisonWithoutIndex");
-    
+
     private long limitInMemory = DEFAULT_QUERY_LIMIT_IN_MEMORY;
-    
+
     private long limitReads = DEFAULT_QUERY_LIMIT_READS;
-    
+
     private boolean failTraversal = DEFAULT_FAIL_TRAVERSAL;
-    
-    private boolean fullTextComparisonWithoutIndex = 
+
+    private boolean fullTextComparisonWithoutIndex =
             DEFAULT_FULL_TEXT_COMPARISON_WITHOUT_INDEX;
-    
-    private boolean sql2Optimisation = 
+
+    private boolean sql2Optimisation =
             Boolean.parseBoolean(System.getProperty(SQL2_OPTIMISATION_FLAG, "true"));
 
     private static final String OAK_FAST_QUERY_SIZE = "oak.fastQuerySize";
     public static final boolean DEFAULT_FAST_QUERY_SIZE = Boolean.getBoolean(OAK_FAST_QUERY_SIZE);
     private boolean fastQuerySize = DEFAULT_FAST_QUERY_SIZE;
 
-    private QueryStatsMBeanImpl queryStats = new QueryStatsMBeanImpl(this);
+    private final QueryStatsMBeanImpl queryStats = new QueryStatsMBeanImpl(this);
 
     /**
      * StatisticsProvider used to record query side metrics.
@@ -95,22 +95,22 @@ public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimit
     public long getLimitInMemory() {
         return limitInMemory;
     }
-    
+
     @Override
     public void setLimitInMemory(long limitInMemory) {
         this.limitInMemory = limitInMemory;
     }
-    
+
     @Override
     public long getLimitReads() {
         return limitReads;
     }
-    
+
     @Override
     public void setLimitReads(long limitReads) {
         this.limitReads = limitReads;
     }
-    
+
     @Override
     public boolean getFailTraversal() {
         return failTraversal;
@@ -135,11 +135,11 @@ public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimit
     public void setFullTextComparisonWithoutIndex(boolean fullTextComparisonWithoutIndex) {
         this.fullTextComparisonWithoutIndex = fullTextComparisonWithoutIndex;
     }
-    
+
     public boolean getFullTextComparisonWithoutIndex() {
         return fullTextComparisonWithoutIndex;
     }
-    
+
     public boolean isSql2Optimisation() {
         return sql2Optimisation;
     }
@@ -147,12 +147,12 @@ public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimit
     public QueryStatsMBean getQueryStats() {
         return queryStats;
     }
-    
+
     public QueryStatsReporter getQueryStatsReporter() {
         return queryStats;
     }
 
-    StatisticsProvider getStatisticsProvider() {
+    public StatisticsProvider getStatisticsProvider() {
         return statisticsProvider;
     }
 
@@ -167,5 +167,5 @@ public class QueryEngineSettings implements QueryEngineSettingsMBean, QueryLimit
                 ", fastQuerySize=" + fastQuerySize +
                 '}';
     }
-    
+
 }
