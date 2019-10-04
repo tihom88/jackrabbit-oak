@@ -102,6 +102,52 @@ public class LogCustomizerTest {
         }
     }
 
+    @Test
+    public void testMatchFormat() {
+        LogCustomizer custom = LogCustomizer
+                .forLogger("org.apache.jackrabbit.oak.commons.junit.LogCustomizerTest")
+                .matchesFormat("Test someInt:{} someString:{}")
+                .create();
+
+        try {
+            custom.starting();
+            LOG.info("Test someInt:10 someString:stringValue");
+            LOG.info("Test someInt:20 someString:stringValue22");
+
+            List<String> logs = custom.getLogs();
+            assertTrue(logs.isEmpty());
+
+            LOG.info("Test someInt:{} someString:{}", 7, "randomValue1");
+            LOG.info("Test someInt:{} someString:{}", 29, "randomValue2");
+            assertEquals(2, logs.size());
+
+        } finally {
+            custom.finished();
+        }
+    }
+
+    @Test
+    public void testMatchFormatWithArguments() {
+        LogCustomizer custom = LogCustomizer
+                .forLogger("org.apache.jackrabbit.oak.commons.junit.LogCustomizerTest")
+                .matchesFormatWithArguments("Test int:{} string:{}", 10, "stringValue")
+                .create();
+
+        try {
+            custom.starting();
+            LOG.info("Test int:10 string:stringValue");
+            LOG.info("Test int:10 string:stringValue");
+
+            List<String> logs = custom.getLogs();
+            assertTrue(logs.isEmpty());
+
+            LOG.info("Test int:{} string:{}", 10, "stringValue");
+            assertEquals(1, logs.size());
+
+        } finally {
+            custom.finished();
+        }
+    }
 
     @Test
     public void testContainsMatch() {

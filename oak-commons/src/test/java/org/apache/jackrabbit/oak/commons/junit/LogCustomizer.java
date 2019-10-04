@@ -87,6 +87,8 @@ public class LogCustomizer {
         private String matchExactMessage;
         private String matchContainsMessage;
         private String matchRegexMessage;
+        private String matchFormat;
+        private Object[] matchFormatArguments;
 
         private LogCustomizerBuilder(String name) {
             this.name = name;
@@ -127,8 +129,21 @@ public class LogCustomizer {
             return this;
         }
 
+        public LogCustomizerBuilder matchesFormat(String message) {
+            this.matchFormat = message;
+            this.matchFormatArguments = null;
+            return this;
+        }
+
+        public LogCustomizerBuilder matchesFormatWithArguments(String message, Object... args) {
+            this.matchFormat = message;
+            this.matchFormatArguments = args;
+            return this;
+        }
+
         public LogCustomizer create() {
-            return new LogCustomizer(name, enableLevel, filterLevel, matchExactMessage, matchContainsMessage, matchRegexMessage);
+            return new LogCustomizer(name, enableLevel, filterLevel, matchExactMessage, matchContainsMessage,
+            matchRegexMessage, matchFormat, matchFormatArguments);
         }
 
         private static Level fromSlf4jLevel(org.slf4j.event.Level level) {
@@ -159,8 +174,10 @@ public class LogCustomizer {
 
     private LogCustomizer(String name, Level enableLevel,
                           final Level filterLevel,
-                          final String matchExactMessage, final String matchContainsMessage, final String matchRegexMessage) {
+                          final String matchExactMessage, final String matchContainsMessage, final String matchRegexMessage,
+                          final String matchFormat, Object[] matchFormatArguments) {
         this.logger = getLogger(name);
+
         if (enableLevel != null) {
             this.enableLevel = enableLevel;
             this.originalLevel = logger.getLevel();
@@ -182,6 +199,8 @@ public class LogCustomizer {
                 if(logLevelOk) {
                     boolean messageMatchOk = true;
                     String message = e.getFormattedMessage();
+                    String messageFormat = e.getMessage();
+                    Object[] messageFormatArguments = e.getArgumentArray();
 
                     if (messageMatchOk && matchExactMessage != null && !matchExactMessage.equals(message)) {
                         messageMatchOk = false;
@@ -193,6 +212,21 @@ public class LogCustomizer {
 
                     if (messageMatchOk && matchRegexMessage != null && !message.matches(matchRegexMessage)) {
                         messageMatchOk = false;
+                    }
+
+                    if (messageMatchOk && matchFormat != null) {
+                        if (!messageFormat.equals(matchFormat)) {
+                            messageMatchOk = false;
+                        } else if (matchFormatArguments != null) {
+                            if (messageFormatArguments.length == matchFormatArguments.length) {
+                                for (int i = 0; i < messageFormatArguments.length && messageMatchOk; i++) {
+                                    messageMatchOk = matchFormatArguments[i].equals(messageFormatArguments[i]);
+                                }
+                            } else {
+                                messageMatchOk = false;
+                            }
+
+                        }
                     }
 
                     if (messageMatchOk) {
