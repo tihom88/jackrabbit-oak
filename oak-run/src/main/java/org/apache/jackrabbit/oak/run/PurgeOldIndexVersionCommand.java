@@ -19,6 +19,7 @@ package org.apache.jackrabbit.oak.run;
 
 import com.google.common.io.Closer;
 import org.apache.jackrabbit.oak.explorer.Explorer;
+import org.apache.jackrabbit.oak.indexversion.PurgeOldIndexVersion;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeStore;
 import org.apache.jackrabbit.oak.plugins.document.mongo.MongoDocumentStore;
 import org.apache.jackrabbit.oak.plugins.document.mongo.MongoDocumentStoreHelper;
@@ -29,28 +30,29 @@ class PurgeOldIndexVersionCommand implements Command {
 
     @Override
     public void execute(String... args) throws Exception {
-        Closer closer = Utils.createCloserWithShutdownHook();
-        String h = "repair mongodb://host:port/database path";
-        try {
-            NodeStore store = Utils.bootstrapNodeStore(args, closer, h);
-            if (!(store instanceof DocumentNodeStore)) {
-                System.err.println("Repair only available for DocumentNodeStore");
-                System.exit(1);
-            }
-            DocumentNodeStore dns = (DocumentNodeStore) store;
-            if (!(dns.getDocumentStore() instanceof MongoDocumentStore)) {
-                System.err.println("Repair only available for MongoDocumentStore");
-                System.exit(1);
-            }
-            MongoDocumentStore docStore = (MongoDocumentStore) dns.getDocumentStore();
-
-            String path = args[args.length - 1];
-            MongoDocumentStoreHelper.repair(docStore, path);
-        } catch (Throwable e) {
-            throw closer.rethrow(e);
-        } finally {
-            closer.close();
-        }
+//        Closer closer = Utils.createCloserWithShutdownHook();
+//        String h = "repair mongodb://host:port/database path";
+//        try {
+//            NodeStore store = Utils.bootstrapNodeStore(args, closer, h);
+//            if (!(store instanceof DocumentNodeStore)) {
+//                System.err.println("Repair only available for DocumentNodeStore");
+//                System.exit(1);
+//            }
+//            DocumentNodeStore dns = (DocumentNodeStore) store;
+//            if (!(dns.getDocumentStore() instanceof MongoDocumentStore)) {
+//                System.err.println("Repair only available for MongoDocumentStore");
+//                System.exit(1);
+//            }
+//            MongoDocumentStore docStore = (MongoDocumentStore) dns.getDocumentStore();
+//
+//            String path = args[args.length - 1];
+//            MongoDocumentStoreHelper.repair(docStore, path);
+//        } catch (Throwable e) {
+//            throw closer.rethrow(e);
+//        } finally {
+//            closer.close();
+//        }
+        new PurgeOldIndexVersion().execute(args);
     }
 
 }
