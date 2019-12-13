@@ -53,6 +53,10 @@ public class IndexName implements Comparable<IndexName> {
         return nodeName;
     }
 
+    public int getCustomerVersion() {
+        return customerVersion;
+    }
+
     private final String nodeName;
     private final String baseName;
     private final boolean isVersioned;

@@ -26,14 +26,14 @@ import org.apache.jackrabbit.oak.plugins.document.mongo.MongoDocumentStoreHelper
 import org.apache.jackrabbit.oak.run.commons.Command;
 import org.apache.jackrabbit.oak.spi.state.NodeStore;
 
-class PurgeOldIndexVersionCommand implements Command {
+public class PurgeOldIndexVersionCommand implements Command {
 
     @Override
     public void execute(String... args) throws Exception {
-//        Closer closer = Utils.createCloserWithShutdownHook();
+//        Closer closer = PurgeOldVersionUtils.createCloserWithShutdownHook();
 //        String h = "repair mongodb://host:port/database path";
 //        try {
-//            NodeStore store = Utils.bootstrapNodeStore(args, closer, h);
+//            NodeStore store = PurgeOldVersionUtils.bootstrapNodeStore(args, closer, h);
 //            if (!(store instanceof DocumentNodeStore)) {
 //                System.err.println("Repair only available for DocumentNodeStore");
 //                System.exit(1);

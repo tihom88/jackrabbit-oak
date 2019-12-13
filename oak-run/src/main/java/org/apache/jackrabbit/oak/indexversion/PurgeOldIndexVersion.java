@@ -8,7 +8,9 @@ import org.apache.jackrabbit.oak.api.CommitFailedException;
 import org.apache.jackrabbit.oak.api.Type;
 import org.apache.jackrabbit.oak.plugins.index.IndexPathService;
 import org.apache.jackrabbit.oak.plugins.index.IndexPathServiceImpl;
+import org.apache.jackrabbit.oak.plugins.index.IndexUpdateProvider;
 import org.apache.jackrabbit.oak.plugins.index.lucene.property.RecursiveDelete;
+import org.apache.jackrabbit.oak.plugins.index.property.PropertyIndexEditorProvider;
 import org.apache.jackrabbit.oak.plugins.index.search.spi.query.IndexName;
 import org.apache.jackrabbit.oak.run.Utils;
 import org.apache.jackrabbit.oak.run.cli.NodeStoreFixture;
@@ -17,10 +19,12 @@ import org.apache.jackrabbit.oak.run.cli.Options;
 import org.apache.jackrabbit.oak.segment.SegmentNodeStoreBuilders;
 import org.apache.jackrabbit.oak.segment.file.FileStore;
 import org.apache.jackrabbit.oak.spi.commit.CommitInfo;
+import org.apache.jackrabbit.oak.spi.commit.EditorHook;
 import org.apache.jackrabbit.oak.spi.commit.EmptyHook;
+import org.apache.jackrabbit.oak.spi.state.NodeBuilder;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
+import org.apache.jackrabbit.oak.spi.state.NodeStateUtils;
 import org.apache.jackrabbit.oak.spi.state.NodeStore;
-import org.apache.jackrabbit.util.ISO8601;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +46,38 @@ public class PurgeOldIndexVersion {
     private static String INDEX_DEFINITION_NODE = ":index-definition";
     private static String REINDEX_COMPLETION_TIMESTAMP = "reindexCompletionTimestamp";
 
+    /**
+     * These operations are in ascending order and only one will be executed at last
+     */
+    enum Operand {
+        NOOP, DELETE_HIDDEN_AND_DISABLE, DELETE
+    }
+
+    private class IndexNameWithOperation {
+        private IndexName indexName;
+
+        public void setOperation(Operand operation) {
+            this.operation = operation;
+        }
+
+        public Operand getOperation() {
+            return this.operation;
+        }
+
+        public IndexName getIndexName() {
+            return this.indexName;
+        }
+
+        private Operand operation;
+
+        IndexNameWithOperation(IndexName indexName) {
+            this.indexName = indexName;
+            this.operation = Operand.NOOP;
+        }
+
+
+    }
+
     public static void main(String[] args) throws Exception {
 
 
@@ -57,37 +93,9 @@ public class PurgeOldIndexVersion {
         //p.execute(nodeStore);
     }
 
-    private String trimSlash(String str) {
-        int startIndex = 0;
-        int endIndex = str.length() - 1;
-        if (str.charAt(startIndex) == '/') {
-            startIndex++;
-        }
-        if (str.charAt(endIndex) == '/') {
-            endIndex--;
-        }
-        return str.substring(startIndex, endIndex + 1);
-    }
-
-    private NodeState getIndexDefinitionNodeParentFromPath(NodeStore store, String trimmedIndexPath) {
-        String[] splitPathArray = getsplitPathArray(trimmedIndexPath);
-        NodeState root = store.getRoot();
-        int i = 0;
-        NodeState node = root;
-        while (i < splitPathArray.length - 1) {
-            node = node.getChildNode(splitPathArray[i]);
-            i++;
-        }
-        return node;
-    }
-
-    private String[] getsplitPathArray(String trimmedIndexPath) {
-        return trimmedIndexPath.split("/");
-    }
-
     public void execute(String... args) throws Exception {
         Options opts = parseCommandLineParams(args);
-        try (NodeStoreFixture fixture = NodeStoreFixtureProvider.create(opts)) {
+        try (NodeStoreFixture fixture = NodeStoreFixtureProvider.create(opts, false)) {
             NodeStore nodeStore = fixture.getStore();
             List<String> indexPathList = getIndexPathList(nodeStore);
             Map<String, List<String>> segregateIndexes = segregateIndexes(indexPathList);
@@ -104,85 +112,44 @@ public class PurgeOldIndexVersion {
             if (indexPaths == null) {
                 indexPaths = new LinkedList<>();
             }
-            indexPaths.add(trimSlash(path));
+            indexPaths.add(PurgeOldVersionUtils.trimSlash(path));
             segregatedIndexes.put(baseIndexPath, indexPaths);
         }
-
         return segregatedIndexes;
     }
 
-
-/*
-    private static JsonObject getIndexDefinitions(NodeStore nodeStore) throws IOException {
-        IndexPathService imageIndexPathService = new IndexPathServiceImpl(nodeStore);
-        IndexDefinitionPrinter indexDefinitionPrinter = new IndexDefinitionPrinter(nodeStore, imageIndexPathService);
-        StringWriter writer = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(writer);
-        indexDefinitionPrinter.print(printWriter, Format.JSON, false);
-        printWriter.flush();
-        writer.flush();
-        StringReader reader = new StringReader(writer.toString());
-        return new Gson().fromJson(reader, JsonObject.class);
-    }*/
-
-    private static IndexPathService getIndexDefinitions(NodeStore nodeStore) throws IOException {
-        IndexPathService imageIndexPathService = new IndexPathServiceImpl(nodeStore);
-        //IndexDefinitionPrinter indexDefinitionPrinter = new IndexDefinitionPrinter(nodeStore, imageIndexPathService);
-        return imageIndexPathService;
-        //StringWriter writer = new StringWriter();
-        //PrintWriter printWriter = new PrintWriter(writer);
-        //indexDefinitionPrinter.print(printWriter, Format.JSON, false);
-        //printWriter.flush();
-        //writer.flush();
-        //    StringReader reader = new StringReader(writer.toString());
-        //    return new Gson().fromJson(reader, JsonObject.class);
-    }
-
-
     public List<String> getIndexPathList(NodeStore store) throws CommitFailedException, IOException {
-        IndexPathService indexPathService = getIndexDefinitions(store);
+        IndexPathService indexPathService = new IndexPathServiceImpl(store);
+
         Iterable<String> indexPaths = indexPathService.getIndexPaths();
         List<String> indexPathsList = new LinkedList<>();
         for (String indexPath : indexPaths) {
-            indexPathsList.add(indexPath);
+            indexPathsList.add(PurgeOldVersionUtils.trimSlash(indexPath));
         }
-
         return indexPathsList;
     }
 
     StringBuilder stringJoiner(String[] stringArray, int arrayIndexToJoin, String delimiter) {
         StringBuilder stringBuilder = new StringBuilder();
-        int index = 0;
-        for (index = 0; index <= arrayIndexToJoin; index++) {
+        for (int index = 0; index <= arrayIndexToJoin; index++) {
             stringBuilder.append(stringArray[index]);
             stringBuilder.append(delimiter);
         }
-        //stringBuilder.append(stringArray[index]);
         return stringBuilder;
     }
 
     private String getBaseIndexPath(String path) {
-        String trimmedPath = trimSlash(path);
+        String trimmedPath = PurgeOldVersionUtils.trimSlash(path);
         String[] fragmentedPath = trimmedPath.split("/");
         String indexName = fragmentedPath[fragmentedPath.length - 1];
-        String baseIndexName = getBaseIndexName(indexName);
+        String baseIndexName = PurgeOldVersionUtils.getBaseIndexName(indexName);
 
         return stringJoiner(fragmentedPath,
                 fragmentedPath.length - 2, "/")
                 .append(baseIndexName).toString();
     }
 
-    private void getBaseIndexPathList(List<String> pathList) {
-        Set<String> baseIndexPathSet = new HashSet<>();
-        for (String path : pathList) {
-            String[] fragmentedPath = trimSlash(path).split("/");
-            String indexName = fragmentedPath[fragmentedPath.length - 1];
-            String baseIndexName = getBaseIndexName(indexName);
-            baseIndexPathSet.add(getBaseIndexPath(path));
-        }
-    }
-
-    private void execute2(NodeStore store, Map<String, List<String>> segregateIndexes) {
+    private void execute2(NodeStore store, Map<String, List<String>> segregateIndexes) throws CommitFailedException {
         for (Map.Entry<String, List<String>> entry : segregateIndexes.entrySet()) {
             execute3(store, entry.getValue());
         }
@@ -191,146 +158,144 @@ public class PurgeOldIndexVersion {
     private List<String> getIndexNameVersionList(List<String> versionedIndexPathList) {
         List<String> indexNameVersionList = new LinkedList<>();
         for (String indexPath : versionedIndexPathList) {
-            String trimmedIndexPath = trimSlash(indexPath);
-            String[] splitPathArray = getsplitPathArray(trimmedIndexPath);
+            String trimmedIndexPath = PurgeOldVersionUtils.trimSlash(indexPath);
+            String[] splitPathArray = trimmedIndexPath.split("/");
             String indexName = splitPathArray[splitPathArray.length - 1];
             indexNameVersionList.add(indexName);
         }
         return indexNameVersionList;
     }
 
-
-    private void execute3(NodeStore store, List<String> versionedIndexPathList) {
+    private void execute3(NodeStore store, List<String> versionedIndexPathList) throws CommitFailedException {
         if (versionedIndexPathList.size() != 0) {
-            String trimmedIndexPath = trimSlash(versionedIndexPathList.get(0));
-            String[] splitPathArray = getsplitPathArray(trimmedIndexPath);
-            NodeState indexDefParentNode = getIndexDefinitionNodeParentFromPath(store, trimmedIndexPath);
+            log.info("Versioned list present for index " + versionedIndexPathList.get(0));
+            String trimmedIndexPath = PurgeOldVersionUtils.trimSlash(versionedIndexPathList.get(0));
+            String[] splitPathArray = trimmedIndexPath.split("/");
+            NodeState indexDefParentNode = NodeStateUtils.getNode(store.getRoot(),
+                    "/" + trimmedIndexPath.substring(0, trimmedIndexPath.lastIndexOf('/'))); //getIndexDefinitionNodeParentFromPath(store, trimmedIndexPath);
             String indexName = splitPathArray[splitPathArray.length - 1];
-            String baseIndexName = getBaseIndexName(indexName);
+            String baseIndexName = PurgeOldVersionUtils.getBaseIndexName(indexName);
 //            Iterable<String> allIndexes = getAllIndexes(indexDefParentNode);
             //List<String> allIndexNameVersions = getAllIndexVersions(baseIndexName, allIndexes);
             List<String> allIndexNameVersions = getIndexNameVersionList(versionedIndexPathList);
-            List<IndexName> indexNameObjectList = getVersionedIndexNameObjects(allIndexNameVersions);
-            indexNameObjectList.sort(new Comparator<IndexName>() {
-                @Override
-                public int compare(IndexName indexNameObj1, IndexName indexNameObj2) {
-                    return indexNameObj1.compareTo(indexNameObj2);
-                }
-            });
-            List<IndexName> toDeleteIndexNameObjectList =
-                    getToDeleteIndexNameObjectList(indexDefParentNode, indexNameObjectList, 100000);
-            //purgeOldIndexVersion(store, toDeleteIndexNameObjectList);
+            List<IndexName> sortedIndexNameObjectList = getSortedVersionedIndexNameObjects(allIndexNameVersions);
+            List<IndexNameWithOperation> toDeleteIndexNameObjectList =
+                    getToDeleteIndexNameObjectList(indexDefParentNode, sortedIndexNameObjectList, 1);
+            purgeOldIndexVersion(store, toDeleteIndexNameObjectList, trimmedIndexPath);
         }
 
     }
 
-    private long getMillisFromString(String strDate) {
-        long millis = ISO8601.parse(strDate).getTimeInMillis();
-        return millis;
-    }
-
-    private List<IndexName> getToDeleteIndexNameObjectList(NodeState indexDefParentNode,
-                                                           List<IndexName> indexNameObjectList, int threshold) {
-        List<IndexName> toDeleteIndexNameObjectList = new LinkedList<>();
-        for (int i = 0; i < indexNameObjectList.size(); i++) {
+    private List<IndexNameWithOperation> getToDeleteIndexNameObjectList(NodeState indexDefParentNode,
+                                                                        List<IndexName> indexNameObjectList, int threshold) {
+        List<IndexNameWithOperation> toDeleteIndexNameObjectList = new LinkedList<>();
+        for (int i = indexNameObjectList.size() - 1; i >= 0; i--) {
             NodeState indexNode = indexDefParentNode
                     .getChildNode(indexNameObjectList.get(i).getNodeName());
+            toDeleteIndexNameObjectList.add(new IndexNameWithOperation(indexNameObjectList.get(i)));
             if (indexNode.hasChildNode(INDEX_DEFINITION_NODE)) {
-                String reindexCompletionTime = indexDefParentNode
-                        .getChildNode(indexNameObjectList.get(i).getNodeName())
-                        .getChildNode(INDEX_DEFINITION_NODE)
-                        .getProperty(REINDEX_COMPLETION_TIMESTAMP).getValue(Type.DATE);
-                long reindexCompletinTimeInMillis = getMillisFromString(reindexCompletionTime);
-                long currentTimeInMillis = System.currentTimeMillis();
-                if (currentTimeInMillis - reindexCompletinTimeInMillis > threshold) {
-                    if (i > 0) {
-                        toDeleteIndexNameObjectList.add(indexNameObjectList.get(i - 1));
+                if (indexNode.getChildNode(INDEX_DEFINITION_NODE)
+                        .getProperty(REINDEX_COMPLETION_TIMESTAMP) != null) {
+                    String reindexCompletionTime = indexDefParentNode
+                            .getChildNode(indexNameObjectList.get(i).getNodeName())
+                            .getChildNode(INDEX_DEFINITION_NODE)
+                            .getProperty(REINDEX_COMPLETION_TIMESTAMP).getValue(Type.DATE);
+                    long reindexCompletionTimeInMillis = PurgeOldVersionUtils.getMillisFromString(reindexCompletionTime);
+                    long currentTimeInMillis = System.currentTimeMillis();
+                    if (currentTimeInMillis - reindexCompletionTimeInMillis > threshold) {
+                        if (i > 0) {
+                            IndexNameWithOperation lastBaseIndexNameWithOperation = null;
+                            for (int j = 0; j < i; j++) {
+
+                                if (indexNameObjectList.get(j).getCustomerVersion() == 0) {
+                                    if (lastBaseIndexNameWithOperation != null) {
+                                        lastBaseIndexNameWithOperation.setOperation(Operand.DELETE);
+                                    }
+                                    lastBaseIndexNameWithOperation = new IndexNameWithOperation(indexNameObjectList.get(j));
+                                    lastBaseIndexNameWithOperation.setOperation(Operand.DELETE_HIDDEN_AND_DISABLE);
+                                    toDeleteIndexNameObjectList.add(lastBaseIndexNameWithOperation);
+                                }
+                                else {
+                                    IndexNameWithOperation customIndexName = new IndexNameWithOperation(indexNameObjectList.get(j));
+                                    customIndexName.setOperation(Operand.DELETE);
+                                    toDeleteIndexNameObjectList.add(customIndexName);
+                                }
+                            }
+                            break;
+                        }
                     }
+                } else {
+                    log.warn(REINDEX_COMPLETION_TIMESTAMP
+                            + " property is not set for index " + indexNameObjectList.get(i).getNodeName());
                 }
             }
-
-
         }
         return toDeleteIndexNameObjectList;
     }
 
-    private void purgeOldIndexVersion(NodeStore store,
-                                      List<IndexName> toDeleteIndexNameObjectList) throws CommitFailedException {
-        String trimmedIndexPath = trimSlash(getIndexPath());
-        String indexPathParent = "/" + trimmedIndexPath.substring(0, trimmedIndexPath.lastIndexOf('/'));
+    private void recursiveDeleteHiddenChildNodes(NodeStore store, String trimmedPath) throws CommitFailedException {
+        NodeState nodeState = NodeStateUtils.getNode(store.getRoot(), "/" + trimmedPath);
+        Iterable<String> childNodeNames = nodeState.getChildNodeNames();
 
-        for (IndexName toDeleteIndexNameObject : toDeleteIndexNameObjectList) {
-            RecursiveDelete recursiveDelete = new RecursiveDelete(store, EmptyHook.INSTANCE, () -> CommitInfo.EMPTY);
-            recursiveDelete.run(indexPathParent + "/" + toDeleteIndexNameObject.getNodeName());
+        for (String childNodeName : childNodeNames) {
+            if (NodeStateUtils.isHidden(childNodeName)) {
+                RecursiveDelete recursiveDelete = new RecursiveDelete(store, EmptyHook.INSTANCE, () -> CommitInfo.EMPTY);
+                recursiveDelete.run("/"+trimmedPath + "/" + childNodeName);
+            }
         }
+
 
     }
 
-    private List<IndexName> getVersionedIndexNameObjects(List<String> allIndexes) {
+    private void purgeOldIndexVersion(NodeStore store,
+                                      List<IndexNameWithOperation> toDeleteIndexNameObjectList, String trimmedIndexPath) throws CommitFailedException {
+        String indexPathParent = "/" + trimmedIndexPath.substring(0, trimmedIndexPath.lastIndexOf('/'));
+        for (IndexNameWithOperation toDeleteIndexNameObject : toDeleteIndexNameObjectList) {
+            NodeState root = store.getRoot();
+            NodeBuilder rootBuilder = root.builder();
+//            NodeBuilder nodeBuilderParent = PurgeOldVersionUtils.getNode(rootBuilder, indexPathParent + "/" + toDeleteIndexNameObject.getNodeName());
+            NodeBuilder nodeBuilder = PurgeOldVersionUtils.getNode(rootBuilder, indexPathParent + "/" + toDeleteIndexNameObject.getIndexName().getNodeName());
+            if (nodeBuilder.exists()) {
+
+                if (toDeleteIndexNameObject.getOperation() == Operand.NOOP) {
+
+                } else if (toDeleteIndexNameObject.getOperation() == Operand.DELETE_HIDDEN_AND_DISABLE) {
+                    nodeBuilder.setProperty("type", "disabled", Type.STRING);
+                    recursiveDeleteHiddenChildNodes(store, trimmedIndexPath.substring(0, trimmedIndexPath.lastIndexOf('/')) + "/" + toDeleteIndexNameObject.getIndexName().getNodeName());
+                } else if (toDeleteIndexNameObject.getOperation() == Operand.DELETE) {
+                    nodeBuilder.remove();
+                }
+
+
+                EditorHook hook = new EditorHook(
+                        new IndexUpdateProvider(new PropertyIndexEditorProvider()));
+
+                store.merge(rootBuilder, hook, CommitInfo.EMPTY);
+                //RecursiveDelete recursiveDelete = new RecursiveDelete(store, EmptyHook.INSTANCE, () -> CommitInfo.EMPTY);
+                //recursiveDelete.run(indexPathParent + "/" + toDeleteIndexNameObject.getNodeName());
+            } else {
+                log.error("nodebuilder null for path " + indexPathParent + "/" + toDeleteIndexNameObject.getIndexName().getNodeName());
+            }
+
+        }
+        store.getRoot();
+
+    }
+
+    private List<IndexName> getSortedVersionedIndexNameObjects(List<String> allIndexes) {
         List<IndexName> indexNameObjectList = new ArrayList<>();
         for (String indexNameString : allIndexes) {
             indexNameObjectList.add(IndexName.parse(indexNameString));
         }
+        indexNameObjectList.sort(new Comparator<IndexName>() {
+            @Override
+            public int compare(IndexName indexNameObj1, IndexName indexNameObj2) {
+                return indexNameObj1.compareTo(indexNameObj2);
+            }
+        });
         return indexNameObjectList;
     }
 
-    List<String> getAllIndexVersions(String baseIndexName, Iterable<String> allIndexes) {
-        List<String> allIndexVersions = new LinkedList<>();
-        for (String index : allIndexes) {
-            if (baseIndexName.equals(getBaseIndexName(index))) {
-                allIndexVersions.add(index);
-            }
-        }
-        return allIndexVersions;
-    }
-
-    private String getIndexPath() {
-        return "/oak:index/lucene";
-    }
-
-    private Iterable<String> getAllIndexes(NodeState indexDefNode) {
-        /*List<String> indexesDummy = new LinkedList<>();
-        indexesDummy.add("lucene");
-        indexesDummy.add("lucene-2");
-        indexesDummy.add("lucene-2-custom-1");
-        indexesDummy.add("lucene-2-custom-2");
-        indexesDummy.add("lucene-3-custom-1");
-        indexesDummy.add("lucene-3-custom-2");
-        indexesDummy.add("lucene-4-custom-1");
-        indexesDummy.add("lucene-4-custom-2");
-        indexesDummy.add("damAsset");
-        indexesDummy.add("damAsset-1");
-        indexesDummy.add("damAsset-2");
-        indexesDummy.add("damAsset-2-custom-1");
-        indexesDummy.add("damAsset-2-custom-2");
-        indexesDummy.add("damAsset-3-custom-1");
-        return indexesDummy;
-*/
-        return indexDefNode.getChildNodeNames();
-    }
-
-
-    public String getBaseIndexName(String versionedIndexName) {
-        String indexBaseName = versionedIndexName.split("-")[0];
-        return indexBaseName;
-    }
-
-    //    private void storeIndex(NodeStore ns, String newIndexName, JsonObject indexDef) {
-//        NodeBuilder rootBuilder = ns.getRoot().builder();
-//        NodeBuilder b = rootBuilder;
-//        for (String p : PathUtils.elements(newIndexName)) {
-//            b = b.child(p);
-//        }
-//        build("  ", b, indexDef);
-//        EditorHook hook = new EditorHook(
-//                new IndexUpdateProvider(new PropertyIndexEditorProvider()));
-//        try {
-//            ns.merge(rootBuilder, hook, CommitInfo.EMPTY);
-//            log("Added index " + newIndexName);
-//        } catch (CommitFailedException e) {
-//            LOG.error("Failed to add index " + newIndexName, e);
-//        }
-//    }
     private boolean quiet;
 
     private Options parseCommandLineParams(String... args) throws Exception {
