@@ -50,7 +50,7 @@ public class AbstractIndexCommandTest {
 
     protected void createTestData(boolean asyncIndex) throws IOException, RepositoryException {
         if (fixture == null) {
-            this.fixture = new RepositoryFixture(temporaryFolder.newFolder());
+            this.fixture = new RepositoryFixture(temporaryFolder.getRoot());
         }
         indexIndexDefinitions();
         createLuceneIndex(asyncIndex);
