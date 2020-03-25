@@ -1470,7 +1470,7 @@ public class QueryImpl implements Query {
         u.setMeasure(measure);
         u.setInternal(isInternal);
         u.setQueryOptions(queryOptions);
-        u.setOrderings(this.getOrderings());
+        u.setOrderings(orderings);
         return u;
     }
     
