@@ -36,7 +36,7 @@ import java.util.List;
 
 public class OrQueryOrderLimitWithoutIndexTest extends AbstractQueryTest {
 
-    private final static String[] baseNodePaths = {"UnionQueryTest", "UnionQueryTest1"};
+    private final static String[] BASE_NODE_PATHS = {"UnionQueryTest", "UnionQueryTest1"};
 
     @Override
     protected ContentRepository createRepository() {
@@ -89,13 +89,12 @@ public class OrQueryOrderLimitWithoutIndexTest extends AbstractQueryTest {
 
         int i = 0;
         for (ResultRow rr : result.getRows()) {
-            System.out.println(rr.getPath());
             Assert.assertEquals(rr.getPath(), expected[i++]);
         }
     }
 
     private void createTestContent(int numberOfNodes) throws CommitFailedException {
-        for (String baseNodePath : baseNodePaths) {
+        for (String baseNodePath : BASE_NODE_PATHS) {
             Tree t = root.getTree("/").addChild(baseNodePath);
             for (int i = 0; i < numberOfNodes; i++) {
                 t = t.addChild("node" + i);
@@ -106,7 +105,7 @@ public class OrQueryOrderLimitWithoutIndexTest extends AbstractQueryTest {
     }
 
     private void deleteTestContent() throws CommitFailedException {
-        for (String baseNodePath : baseNodePaths) {
+        for (String baseNodePath : BASE_NODE_PATHS) {
             root.getTree("/" + baseNodePath).remove();
             root.commit();
         }
