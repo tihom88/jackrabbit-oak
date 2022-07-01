@@ -21,6 +21,7 @@ package org.apache.jackrabbit.oak.index.indexer.document.flatfile;
 
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
+import org.apache.jackrabbit.oak.index.IndexHelper;
 import org.apache.jackrabbit.oak.index.indexer.document.CompositeException;
 import org.apache.jackrabbit.oak.index.indexer.document.NodeStateEntryTraverserFactory;
 import org.apache.jackrabbit.oak.spi.blob.BlobStore;
@@ -104,12 +105,17 @@ public class FlatFileNodeStoreBuilder {
     private final MemoryManager memoryManager;
     private long dumpThreshold = Integer.getInteger(OAK_INDEXER_DUMP_THRESHOLD_IN_MB, OAK_INDEXER_DUMP_THRESHOLD_IN_MB_DEFAULT) * FileUtils.ONE_MB;
     private Predicate<String> pathPredicate = path -> true;
+    private final IndexHelper indexHelper;
+
+    // Get these from params later on...
+    private static final String initialCheckpoint = "r181b7c9d7cf-0-1";
+    private static final String finalCheckpoint = "r181b7cab42a-0-1";
 
     private final boolean useZip = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_USE_ZIP, "true"));
     private final boolean useTraverseWithSort = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_TRAVERSE_WITH_SORT, "true"));
     private final String sortStrategyTypeString = System.getProperty(OAK_INDEXER_SORT_STRATEGY_TYPE);
-    private final SortStrategyType sortStrategyType = sortStrategyTypeString != null ? SortStrategyType.valueOf(sortStrategyTypeString) :
-            (useTraverseWithSort ? SortStrategyType.TRAVERSE_WITH_SORT : SortStrategyType.STORE_AND_SORT);
+    private final SortStrategyType sortStrategyType = SortStrategyType.INCREMENTAL_STORE;/*sortStrategyTypeString != null ? SortStrategyType.valueOf(sortStrategyTypeString) :
+            (useTraverseWithSort ? SortStrategyType.TRAVERSE_WITH_SORT : SortStrategyType.STORE_AND_SORT);*/
 
     public enum SortStrategyType {
         /**
@@ -123,23 +129,43 @@ public class FlatFileNodeStoreBuilder {
         /**
          * System property {@link #OAK_INDEXER_SORT_STRATEGY_TYPE} if set to this value would result in {@link MultithreadedTraverseWithSortStrategy} being used.
          */
-        MULTITHREADED_TRAVERSE_WITH_SORT
+        MULTITHREADED_TRAVERSE_WITH_SORT,
+
+        INCREMENTAL_STORE
+    }
+
+    public FlatFileNodeStoreBuilder(File workDir, MemoryManager memoryManager, IndexHelper indexHelper) {
+        this.workDir = workDir;
+        this.memoryManager = memoryManager;
+        this.indexHelper = indexHelper;
     }
 
     public FlatFileNodeStoreBuilder(File workDir, MemoryManager memoryManager) {
         this.workDir = workDir;
         this.memoryManager = memoryManager;
+        this.indexHelper = null;
     }
 
     public FlatFileNodeStoreBuilder(File workDir) {
         this.workDir = workDir;
         this.memoryManager = new DefaultMemoryManager();
+        this.indexHelper = null;
     }
 
     public FlatFileNodeStoreBuilder withLastModifiedBreakPoints(List<Long> lastModifiedBreakPoints) {
         this.lastModifiedBreakPoints = lastModifiedBreakPoints;
         return this;
     }
+
+    /*public FlatFileNodeStoreBuilder withInitialCheckpoint(String checkpoint) {
+        this.initialCheckpoint = checkpoint;
+        return this;
+    }
+
+    public FlatFileNodeStoreBuilder withFinalCheckpoint(String checkpoint) {
+        this.finalCheckpoint = checkpoint;
+        return this;
+    }*/
 
     public FlatFileNodeStoreBuilder withBlobStore(BlobStore blobStore) {
         this.blobStore = blobStore;
@@ -219,6 +245,8 @@ public class FlatFileNodeStoreBuilder {
                 log.info("Using MultithreadedTraverseWithSortStrategy");
                 return new MultithreadedTraverseWithSortStrategy(nodeStateEntryTraverserFactory, lastModifiedBreakPoints, comparator,
                         blobStore, dir, existingDataDumpDirs, useZip, memoryManager, dumpThreshold, pathPredicate);
+            case INCREMENTAL_STORE:
+                return new IncrementalStore(indexHelper.getNodeStore().retrieve(initialCheckpoint), indexHelper.getNodeStore().retrieve(finalCheckpoint), dir, comparator, useZip, pathPredicate, entryWriter);
         }
         throw new IllegalStateException("Not a valid sort strategy value " + sortStrategyType);
     }

@@ -153,7 +153,7 @@ public abstract class DocumentStoreIndexerBase implements Closeable{
         MemoryManager memoryManager = new DefaultMemoryManager();
         while (flatFileStore == null && executionCount <= MAX_DOWNLOAD_ATTEMPTS) {
             try {
-                builder = new FlatFileNodeStoreBuilder(indexHelper.getWorkDir(), memoryManager)
+                builder = new FlatFileNodeStoreBuilder(indexHelper.getWorkDir(), memoryManager, indexHelper)
                         .withLastModifiedBreakPoints(lastModifiedBreakPoints)
                         .withBlobStore(indexHelper.getGCBlobStore())
                         .withPreferredPathElements((preferredPathElements != null) ? preferredPathElements : indexer.getRelativeIndexedNodeNames())

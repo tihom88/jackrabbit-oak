@@ -248,7 +248,7 @@ public class IndexCommand implements Command {
                     String pathToFFS = ffs.getFlatFileStorePath();
                     System.setProperty(OAK_INDEXER_SORTED_FILE_PATH, pathToFFS);
                 }
-                indexer.reindex();
+                //indexer.reindex();
             }
         } else {
             try (OutOfBandIndexer indexer = new OutOfBandIndexer(extendedIndexHelper, indexerSupport)) {
