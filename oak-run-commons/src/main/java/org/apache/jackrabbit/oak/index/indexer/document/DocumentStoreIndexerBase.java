@@ -135,6 +135,29 @@ public abstract class DocumentStoreIndexerBase implements Closeable{
         }
     }
 
+    private FlatFileStore buildIncrementalFFS(String initialCheckpoint, String finalCheckpoint, Predicate<String> pathPredicate, Set<String> preferredPathElements) throws IOException {
+        FlatFileNodeStoreBuilder builder = null;
+        FlatFileStore flatFileStore = null;
+        Stopwatch flatFileStoreWatch = Stopwatch.createStarted();
+        MemoryManager memoryManager = new DefaultMemoryManager();
+        try {
+            builder = new FlatFileNodeStoreBuilder(indexHelper.getWorkDir(), memoryManager, indexHelper)
+                    .withBlobStore(indexHelper.getGCBlobStore())
+                    .withPreferredPathElements(preferredPathElements)
+                    .addExistingDataDumpDir(indexerSupport.getExistingDataDumpDir())
+                    .withPathPredicate(pathPredicate)
+                    .withInitialCheckpoint(initialCheckpoint)
+                    .withFinalCheckpoint(finalCheckpoint)
+                    .withSortStrategyType(FlatFileNodeStoreBuilder.SortStrategyType.INCREMENTAL_STORE);
+            flatFileStore = builder.build();
+            closer.register(flatFileStore);
+        } catch (Exception e) {
+            throw new IOException("Could not build flat file store", e);
+        }
+        log.info("Completed the flat file store build in {}", flatFileStoreWatch);
+        return flatFileStore;
+    }
+
     private FlatFileStore buildFlatFileStore(NodeState checkpointedState, CompositeIndexer indexer, Predicate<String> pathPredicate, Set<String> preferredPathElements) throws IOException {
 
         Stopwatch flatFileStoreWatch = Stopwatch.createStarted();
@@ -191,13 +214,17 @@ public abstract class DocumentStoreIndexerBase implements Closeable{
         return flatFileStore;
     }
 
+    public FlatFileStore buildFlatFileStore() throws IOException, CommitFailedException {
+        return buildFlatFileStore(false, null, null);
+    }
+
     /**
      *
      * @return an Instance of FlatFileStore, whose getFlatFileStorePath() method can be used to get the absolute path to this store.
      * @throws IOException
      * @throws CommitFailedException
      */
-    public FlatFileStore buildFlatFileStore() throws IOException, CommitFailedException {
+    public FlatFileStore buildFlatFileStore(boolean incremental, String initialCheckpoint, String finalCheckpoint) throws IOException, CommitFailedException {
         NodeState checkpointedState = indexerSupport.retrieveNodeStateForCheckpoint();
         NodeStore copyOnWriteStore = new MemoryNodeStore(checkpointedState);
         NodeBuilder builder = copyOnWriteStore.getRoot().builder();
@@ -215,7 +242,9 @@ public abstract class DocumentStoreIndexerBase implements Closeable{
             indexDefinitions.add(indexDf);
         }
         Predicate<String> predicate = s -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(s) != PathFilter.Result.EXCLUDE);
-        FlatFileStore flatFileStore = buildFlatFileStore(checkpointedState, null, predicate, preferredPathElements);
+
+
+        FlatFileStore flatFileStore = incremental ? buildIncrementalFFS(initialCheckpoint, finalCheckpoint, predicate, preferredPathElements) : buildFlatFileStore(checkpointedState, null, predicate, preferredPathElements);
         log.info("FlatFileStore built at {}. To use this flatFileStore in a reindex step, set System Property-{} with value {}",
                 flatFileStore.getFlatFileStorePath(), OAK_INDEXER_SORTED_FILE_PATH, flatFileStore.getFlatFileStorePath());
         return flatFileStore;

@@ -106,16 +106,14 @@ public class FlatFileNodeStoreBuilder {
     private long dumpThreshold = Integer.getInteger(OAK_INDEXER_DUMP_THRESHOLD_IN_MB, OAK_INDEXER_DUMP_THRESHOLD_IN_MB_DEFAULT) * FileUtils.ONE_MB;
     private Predicate<String> pathPredicate = path -> true;
     private final IndexHelper indexHelper;
-
-    // Get these from params later on...
-    private static final String initialCheckpoint = "r181b7c9d7cf-0-1";
-    private static final String finalCheckpoint = "r181b7cab42a-0-1";
+    private static String initialCheckpoint;
+    private static String finalCheckpoint;
 
     private final boolean useZip = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_USE_ZIP, "true"));
     private final boolean useTraverseWithSort = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_TRAVERSE_WITH_SORT, "true"));
     private final String sortStrategyTypeString = System.getProperty(OAK_INDEXER_SORT_STRATEGY_TYPE);
-    private final SortStrategyType sortStrategyType = SortStrategyType.INCREMENTAL_STORE;/*sortStrategyTypeString != null ? SortStrategyType.valueOf(sortStrategyTypeString) :
-            (useTraverseWithSort ? SortStrategyType.TRAVERSE_WITH_SORT : SortStrategyType.STORE_AND_SORT);*/
+    private SortStrategyType sortStrategyType = sortStrategyTypeString != null ? SortStrategyType.valueOf(sortStrategyTypeString) :
+            (useTraverseWithSort ? SortStrategyType.TRAVERSE_WITH_SORT : SortStrategyType.STORE_AND_SORT);
 
     public enum SortStrategyType {
         /**
@@ -157,7 +155,17 @@ public class FlatFileNodeStoreBuilder {
         return this;
     }
 
-    /*public FlatFileNodeStoreBuilder withInitialCheckpoint(String checkpoint) {
+    /**
+     * Using this will override the sort strategy type set by System property oak.indexer.sortStrategyType
+     * @param sortStrategyType
+     * @return FlatFileNodeStoreBuilder
+     */
+    public FlatFileNodeStoreBuilder withSortStrategyType(SortStrategyType sortStrategyType) {
+        this.sortStrategyType = sortStrategyType;
+        return this;
+    }
+
+    public FlatFileNodeStoreBuilder withInitialCheckpoint(String checkpoint) {
         this.initialCheckpoint = checkpoint;
         return this;
     }
@@ -165,7 +173,7 @@ public class FlatFileNodeStoreBuilder {
     public FlatFileNodeStoreBuilder withFinalCheckpoint(String checkpoint) {
         this.finalCheckpoint = checkpoint;
         return this;
-    }*/
+    }
 
     public FlatFileNodeStoreBuilder withBlobStore(BlobStore blobStore) {
         this.blobStore = blobStore;
