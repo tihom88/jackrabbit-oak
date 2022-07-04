@@ -35,11 +35,10 @@ public class IncrementalStore implements SortStrategy {
     private final File storeDir;
     private final boolean compressionEnabled;
     private Predicate<String> pathPredicate;
-    private long entryCount;
-    private long textSize;
-    private static final int LINE_SEP_LENGTH = LINE_SEPARATOR.value().length();
     private boolean deleteOriginal = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_DELETE_ORIGINAL, "true"));
     private int maxMemory = Integer.getInteger(OAK_INDEXER_MAX_SORT_MEMORY_IN_GB, OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT);
+    private long textSize = 0;
+    private long entryCount = 0;
 
     public IncrementalStore(@NotNull NodeState before, @NotNull NodeState after, File storeDir,
                             PathElementComparator comparator, boolean compressionEnabled, Predicate<String> pathPredicate, NodeStateEntryWriter entryWriter) {
@@ -54,45 +53,33 @@ public class IncrementalStore implements SortStrategy {
 
     @Override
     public File createSortedStoreFile() throws IOException {
-
-        Map<NodeState, String> pathMap = new HashMap();
-
-        EditorDiff.process(VisibleEditor.wrap(new DeltaFFSEditor(pathMap)), before, after);
-
-        File storeFile =  writeToStore(pathMap, storeDir, getStoreFileName());
-        return sortStoreFile(storeFile);
+        Stopwatch sw = Stopwatch.createStarted();
+        File file = new File(storeDir, getStoreFileName());
+        try (BufferedWriter w = FlatFileStoreUtils.createWriter(file, compressionEnabled)) {
+            EditorDiff.process(VisibleEditor.wrap(new DeltaFFSEditor(w, entryWriter, pathPredicate, this)), before, after);
+        }
+        String sizeStr = compressionEnabled ? String.format("compressed/%s actual size", humanReadableByteCount(textSize)) : "";
+        log.info("Dumped {} nodestates in json format in {} ({} {})", entryCount, sw, humanReadableByteCount(file.length()), sizeStr);
+        return sortStoreFile(file);
     }
+
+
 
     @Override
     public long getEntryCount() {
         return 0;
     }
 
+    public void incrementEntryCount() {
+        entryCount++;
+    }
 
-    private File writeToStore(Map<NodeState, String> deltaContent, File dir, String fileName) throws IOException {
-        entryCount = 0;
-        File file = new File(dir, fileName);
-        Stopwatch sw = Stopwatch.createStarted();
-        try (BufferedWriter w = FlatFileStoreUtils.createWriter(file, compressionEnabled)) {
-            for (NodeState e : deltaContent.keySet()) {
-                String path = "";
-                if (e instanceof DocumentNodeState) {
-                    path = ((DocumentNodeState)e).getPath().toString();
-                } else {
-                    path = e.toString().split(",")[0].split("'")[1].replace("'","");
-                }
-                if (!NodeStateUtils.isHiddenPath(path) && pathPredicate.test(path)) {
-                    String line =  path + "|" + entryWriter.asJson(e) + "|" + deltaContent.get(e);
-                    w.append(line);
-                    w.newLine();
-                    textSize += line.length() + LINE_SEP_LENGTH;
-                    entryCount++;
-                }
-            }
-        }
-        String sizeStr = compressionEnabled ? String.format("compressed/%s actual size", humanReadableByteCount(textSize)) : "";
-        log.info("Dumped {} nodestates in json format in {} ({} {})",entryCount, sw, humanReadableByteCount(file.length()), sizeStr);
-        return file;
+    public void setTextSize(long textSize) {
+        this.textSize = textSize;
+    }
+
+    public long getTextSize() {
+        return this.textSize;
     }
 
     private File sortStoreFile(File storeFile) throws IOException {
