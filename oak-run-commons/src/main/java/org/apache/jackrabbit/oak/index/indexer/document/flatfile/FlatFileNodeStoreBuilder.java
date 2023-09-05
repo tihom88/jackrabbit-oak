@@ -107,8 +107,8 @@ public class FlatFileNodeStoreBuilder {
     /**
      * Value of this system property indicates max memory that should be used if jmx based memory monitoring is not available.
      */
-    static final String OAK_INDEXER_MAX_SORT_MEMORY_IN_GB = "oak.indexer.maxSortMemoryInGB";
-    static final int OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT = 2;
+    public static final String OAK_INDEXER_MAX_SORT_MEMORY_IN_GB = "oak.indexer.maxSortMemoryInGB";
+    public static final int OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT = 2;
     static final String OAK_INDEXER_DUMP_THRESHOLD_IN_MB = "oak.indexer.dumpThresholdInMB";
     static final int OAK_INDEXER_DUMP_THRESHOLD_IN_MB_DEFAULT = 16;
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -151,6 +151,7 @@ public class FlatFileNodeStoreBuilder {
          * System property {@link #OAK_INDEXER_SORT_STRATEGY_TYPE} if set to this value would result in {@link MultithreadedTraverseWithSortStrategy} being used.
          */
         MULTITHREADED_TRAVERSE_WITH_SORT,
+
         /**
          * System property {@link #OAK_INDEXER_SORT_STRATEGY_TYPE} if set to this value would result in {@link PipelinedStrategy} being used.
          */

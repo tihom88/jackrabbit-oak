@@ -30,6 +30,8 @@ import org.apache.jackrabbit.oak.index.indexer.document.flatfile.DefaultMemoryMa
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileNodeStoreBuilder;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStore;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.MemoryManager;
+import org.apache.jackrabbit.oak.index.indexer.document.incrementalstore.IncrementalStoreBuilder;
+import org.apache.jackrabbit.oak.index.indexer.document.incrementalstore.IncrementalStore;
 import org.apache.jackrabbit.oak.plugins.document.Collection;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeState;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeStore;
@@ -204,6 +206,26 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         }
         log.info("Completed the flat file store build in {}", flatFileStoreWatch);
         return storeList;
+    }
+
+    private IncrementalStore buildIncrementalStore(String initialCheckpoint, String finalCheckpoint, Predicate<String> pathPredicate, Set<String> preferredPathElements) throws IOException {
+        IncrementalStoreBuilder builder = null;
+        IncrementalStore incrementalStore = null;
+        Stopwatch flatFileStoreWatch = Stopwatch.createStarted();
+        MemoryManager memoryManager = new DefaultMemoryManager();
+        try {
+            builder = new IncrementalStoreBuilder(indexHelper.getWorkDir(), memoryManager, indexHelper)
+                    .withPreferredPathElements(preferredPathElements)
+                    .withPathPredicate(pathPredicate)
+                    .withInitialCheckpoint(initialCheckpoint)
+                    .withFinalCheckpoint(finalCheckpoint);
+            incrementalStore = builder.build();
+            closer.register(incrementalStore);
+        } catch (Exception e) {
+            throw new IOException("Could not build flat file store", e);
+        }
+        log.info("Completed the flat file store build in {}", flatFileStoreWatch);
+        return incrementalStore;
     }
 
     /**
