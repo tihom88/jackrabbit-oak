@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.jackrabbit.oak.index.indexer.document.flatfile.pipelined;
+package org.apache.jackrabbit.oak.index.indexer.document.incrementalstore;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.jackrabbit.oak.api.CommitFailedException;
 import org.apache.jackrabbit.oak.commons.Compression;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateEntryWriter;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.PathElementComparator;
-import org.apache.jackrabbit.oak.index.indexer.document.incrementalstore.IncrementalFlatFileStoreStrategy;
-import org.apache.jackrabbit.oak.index.indexer.document.incrementalstore.MergeIncrementalFFS;
+import org.apache.jackrabbit.oak.index.indexer.document.flatfile.pipelined.PipelinedStrategy;
 import org.apache.jackrabbit.oak.plugins.document.DocumentMK;
 import org.apache.jackrabbit.oak.plugins.document.DocumentMKBuilderProvider;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeStore;

@@ -163,8 +163,5 @@ public class IncrementalStoreBuilder {
         log.info("Preferred path elements are {}", Iterables.toString(preferredPathElements));
         log.info("Compression enabled while sorting : {} ({})", compressionEnabled, FlatFileNodeStoreBuilder.OAK_INDEXER_USE_ZIP);
         log.info("LZ4 enabled for compression algorithm : {} ({})", useLZ4, FlatFileNodeStoreBuilder.OAK_INDEXER_USE_LZ4);
-//        log.info("Sort strategy : {} ({})", sortStrategyType, FlatFileNodeStoreBuilder.OAK_INDEXER_TRAVERSE_WITH_SORT);
     }
-
-
 }
