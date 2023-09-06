@@ -212,13 +212,11 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         IncrementalStoreBuilder builder = null;
         IncrementalStore incrementalStore = null;
         Stopwatch flatFileStoreWatch = Stopwatch.createStarted();
-        MemoryManager memoryManager = new DefaultMemoryManager();
         try {
-            builder = new IncrementalStoreBuilder(indexHelper.getWorkDir(), memoryManager, indexHelper)
+            builder = new IncrementalStoreBuilder(indexHelper.getWorkDir(), indexHelper, initialCheckpoint, finalCheckpoint)
                     .withPreferredPathElements(preferredPathElements)
                     .withPathPredicate(pathPredicate)
-                    .withInitialCheckpoint(initialCheckpoint)
-                    .withFinalCheckpoint(finalCheckpoint);
+                    .withBlobStore(indexHelper.getGCBlobStore());
             incrementalStore = builder.build();
             closer.register(incrementalStore);
         } catch (Exception e) {
@@ -243,7 +241,7 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         }
         Predicate<String> predicate = s -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(s) != PathFilter.Result.EXCLUDE);
         FlatFileStore flatFileStore = buildFlatFileStoreList(checkpointedState, null, predicate,
-            preferredPathElements, IndexerConfiguration.parallelIndexEnabled(), indexDefinitions).get(0);
+                preferredPathElements, IndexerConfiguration.parallelIndexEnabled(), indexDefinitions).get(0);
         log.info("FlatFileStore built at {}. To use this flatFileStore in a reindex step, set System Property-{} with value {}",
                 flatFileStore.getFlatFileStorePath(), OAK_INDEXER_SORTED_FILE_PATH, flatFileStore.getFlatFileStorePath());
         return flatFileStore;
@@ -257,7 +255,6 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         NodeState checkpointedState = indexerSupport.retrieveNodeStateForCheckpoint();
         NodeStore copyOnWriteStore = new MemoryNodeStore(checkpointedState);
         indexerSupport.switchIndexLanesAndReindexFlag(copyOnWriteStore);
-
         NodeBuilder builder = copyOnWriteStore.getRoot().builder();
         CompositeIndexer indexer = prepareIndexers(copyOnWriteStore, builder, progressReporter);
         if (indexer.isEmpty()) {

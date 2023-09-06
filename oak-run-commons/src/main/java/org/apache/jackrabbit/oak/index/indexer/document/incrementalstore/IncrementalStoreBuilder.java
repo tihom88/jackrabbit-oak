@@ -24,12 +24,12 @@ import org.apache.jackrabbit.oak.index.IndexHelper;
 import org.apache.jackrabbit.oak.index.indexer.document.CompositeException;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileNodeStoreBuilder;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.LZ4Compression;
-import org.apache.jackrabbit.oak.index.indexer.document.flatfile.MemoryManager;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateEntryReader;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateEntryWriter;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.PathElementComparator;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.SortStrategy;
 import org.apache.jackrabbit.oak.spi.blob.BlobStore;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +37,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -48,12 +49,19 @@ public class IncrementalStoreBuilder {
     private final String INCREMENTAL_STORE_DIR_NAME_PREFIX = "inc-store";
 
     private final File workDir;
-    private final MemoryManager memoryManager;
     private final IndexHelper indexHelper;
+    private final String initialCheckpoint;
+    private final String finalCheckpoint;
+    private Predicate<String> pathPredicate = path -> true;
+    private Set<String> preferredPathElements = Collections.emptySet();
+    private BlobStore blobStore;
 
-    private String initialCheckpoint;
-    private String incrementalsFFSOutputFile;
-    private String finalCheckpoint;
+    private final boolean compressionEnabled = Boolean.parseBoolean(System.getProperty(FlatFileNodeStoreBuilder.OAK_INDEXER_USE_ZIP, "true"));
+    private final boolean useLZ4 = Boolean.parseBoolean(System.getProperty(FlatFileNodeStoreBuilder.OAK_INDEXER_USE_LZ4, "false"));
+    private final Compression algorithm = compressionEnabled ? (useLZ4 ? new LZ4Compression() : Compression.GZIP) :
+            Compression.NONE;
+
+
     /**
      * System property name for sort strategy. This takes precedence over {@link #INCREMENTAL_SORT_STRATEGY_TYPE}.
      * Allowed values are the values from enum {@link IncrementalStoreBuilder.IncrementalSortStrategyType}
@@ -75,25 +83,12 @@ public class IncrementalStoreBuilder {
         INCREMENTAL_FFS_STORE
     }
 
-    public IncrementalStoreBuilder(File workDir, MemoryManager memoryManager, IndexHelper indexHelper) {
+    public IncrementalStoreBuilder(File workDir, IndexHelper indexHelper,
+                                   @NotNull String initialCheckpoint, @NotNull String finalCheckpoint) {
         this.workDir = workDir;
-        this.memoryManager = memoryManager;
         this.indexHelper = indexHelper;
-    }
-
-    public IncrementalStoreBuilder withInitialCheckpoint(String checkpoint) {
-        this.initialCheckpoint = checkpoint;
-        return this;
-    }
-
-    public IncrementalStoreBuilder withFinalCheckpoint(String checkpoint) {
-        this.finalCheckpoint = checkpoint;
-        return this;
-    }
-
-    public IncrementalStoreBuilder withOutputFile(String incrementalsFFSOutputFile) {
-        this.incrementalsFFSOutputFile = incrementalsFFSOutputFile;
-        return this;
+        this.initialCheckpoint = Objects.requireNonNull(initialCheckpoint);
+        this.finalCheckpoint = Objects.requireNonNull(finalCheckpoint);
     }
 
     public IncrementalStoreBuilder withPreferredPathElements(Set<String> preferredPathElements) {
@@ -106,25 +101,16 @@ public class IncrementalStoreBuilder {
         return this;
     }
 
-    private Predicate<String> pathPredicate = path -> true;
-
     public IncrementalStoreBuilder withPathPredicate(Predicate<String> pathPredicate) {
         this.pathPredicate = pathPredicate;
         return this;
     }
 
+    public IncrementalStoreBuilder withBlobStore(BlobStore blobStore) {
+        this.blobStore = blobStore;
+        return this;
+    }
 
-    private Set<String> preferredPathElements = Collections.emptySet();
-    private BlobStore blobStore;
-    private PathElementComparator comparator;
-    private NodeStateEntryWriter entryWriter;
-    private long entryCount = 0;
-
-    private final boolean compressionEnabled = Boolean.parseBoolean(System.getProperty(FlatFileNodeStoreBuilder.OAK_INDEXER_USE_ZIP, "true"));
-    private final boolean useLZ4 = Boolean.parseBoolean(System.getProperty(FlatFileNodeStoreBuilder.OAK_INDEXER_USE_LZ4, "false"));
-
-    private final Compression algorithm = compressionEnabled ? (useLZ4 ? new LZ4Compression() : Compression.GZIP) :
-            Compression.NONE;
 
     public IncrementalStore build() throws IOException, CompositeException {
         logFlags();
@@ -132,18 +118,19 @@ public class IncrementalStoreBuilder {
 
         switch (sortStrategyType) {
             case INCREMENTAL_FFS_STORE:
-                comparator = new PathElementComparator(preferredPathElements);
-                entryWriter = new NodeStateEntryWriter(blobStore);
-                SortStrategy strategy = new IncrementalFlatFileStoreStrategy(indexHelper.getNodeStore().retrieve(initialCheckpoint),
-                        indexHelper.getNodeStore().retrieve(finalCheckpoint),
+                PathElementComparator comparator = new PathElementComparator(preferredPathElements);
+                NodeStateEntryWriter entryWriter = new NodeStateEntryWriter(blobStore);
+                SortStrategy strategy = new IncrementalFlatFileStoreStrategy(
+                        Objects.requireNonNull(indexHelper.getNodeStore().retrieve(initialCheckpoint)),
+                        Objects.requireNonNull(indexHelper.getNodeStore().retrieve(finalCheckpoint)),
                         dir, comparator, algorithm, pathPredicate, entryWriter);
                 File result = strategy.createSortedStoreFile();
-                entryCount = strategy.getEntryCount();
+                long entryCount = strategy.getEntryCount();
                 IncrementalStore store = new IncrementalFlatFileStore(blobStore, result,
                         new NodeStateEntryReader(blobStore),
                         unmodifiableSet(preferredPathElements), algorithm);
                 if (entryCount > 0) {
-                    ((IncrementalFlatFileStore) store).setEntryCount(entryCount);
+                    store.setEntryCount(entryCount);
                 }
                 return store;
         }
@@ -151,8 +138,7 @@ public class IncrementalStoreBuilder {
     }
 
     private File createStoreDir() throws IOException {
-        File flatFileStoreDir = Files.createTempDirectory(workDir.toPath(), getDirNamePrefix()).toFile();
-        return flatFileStoreDir;
+        return Files.createTempDirectory(workDir.toPath(), getDirNamePrefix()).toFile();
     }
 
     private String getDirNamePrefix() {

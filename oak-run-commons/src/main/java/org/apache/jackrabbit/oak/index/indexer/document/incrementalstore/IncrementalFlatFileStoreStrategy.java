@@ -46,16 +46,16 @@ import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFile
 public class IncrementalFlatFileStoreStrategy implements SortStrategy {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    public  static final String OAK_INDEXER_DELETE_ORIGINAL = "oak.indexer.deleteOriginal";
+    public static final String OAK_INDEXER_DELETE_ORIGINAL = "oak.indexer.deleteOriginal";
     private final NodeState before;
     private final NodeState after;
     private final PathElementComparator comparator;
     private final NodeStateEntryWriter entryWriter;
     private final File storeDir;
     private final Compression algorithm;
-    private Predicate<String> pathPredicate;
-    private boolean deleteOriginal = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_DELETE_ORIGINAL, "true"));
-    private int maxMemory = Integer.getInteger(OAK_INDEXER_MAX_SORT_MEMORY_IN_GB, OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT);
+    private final Predicate<String> pathPredicate;
+    private final boolean deleteOriginal = Boolean.parseBoolean(System.getProperty(OAK_INDEXER_DELETE_ORIGINAL, "true"));
+    private final int maxMemory = Integer.getInteger(OAK_INDEXER_MAX_SORT_MEMORY_IN_GB, OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT);
     private long textSize = 0;
     private long entryCount = 0;
 

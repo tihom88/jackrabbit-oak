@@ -18,7 +18,21 @@
  */
 package org.apache.jackrabbit.oak.index.indexer.document.incrementalstore;
 
+import org.apache.jackrabbit.oak.index.indexer.document.NodeStateEntry;
+
 import java.io.Closeable;
+import java.io.IOException;
+import java.util.Iterator;
 
 public interface IncrementalStore extends Closeable {
+
+    Iterator<NodeStateEntry> iterator();
+
+    String getFlatFileStorePath();
+
+    long getEntryCount();
+
+    void setEntryCount(long entryCount);
+
+    void close() throws IOException;
 }

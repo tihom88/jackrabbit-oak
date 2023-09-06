@@ -41,9 +41,7 @@ public class MergeIncrementalFFS {
     private final File baseFFS;
     private final File incrementalFFS;
     private final File merged;
-    private Comparator<NodeStateHolder> comparator;
     private final Set<String> preferredPathElements;
-
     private final Compression algorithm;
 
     public MergeIncrementalFFS(Set<String> preferredPathElements, File baseFFS, File incrementalFFS,
@@ -57,9 +55,9 @@ public class MergeIncrementalFFS {
 
     public void doMerge() throws IOException {
 
-        log.info("************** Base FFS " + baseFFS.getAbsolutePath());
-        log.info("************** incrementalFFS FFS " + incrementalFFS.getAbsolutePath());
-        log.info("**************  merged FFS " + merged.getAbsolutePath());
+        log.info("base FFS " + baseFFS.getAbsolutePath());
+        log.info("incremental FFS " + incrementalFFS.getAbsolutePath());
+        log.info("merged FFS " + merged.getAbsolutePath());
 
         try (BufferedWriter writer = FlatFileStoreUtils.createWriter(merged, algorithm);
              BufferedReader baseFFSBufferedReader = FlatFileStoreUtils.createReader(baseFFS, algorithm);
@@ -67,7 +65,7 @@ public class MergeIncrementalFFS {
             String baseLine = baseFFSBufferedReader.readLine();
             String incLine = incrementalFFSBufferedReader.readLine();
 
-            comparator = (e1, e2) -> new PathElementComparator(preferredPathElements).compare(e1.getPathElements(), e2.getPathElements());
+            Comparator<NodeStateHolder> comparator = (e1, e2) -> new PathElementComparator(preferredPathElements).compare(e1.getPathElements(), e2.getPathElements());
             int compared;
             while (baseLine != null || incLine != null) {
                 if (baseLine != null && incLine != null) {
