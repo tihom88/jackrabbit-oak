@@ -118,12 +118,11 @@ public class IncrementalStoreBuilder {
 
         switch (sortStrategyType) {
             case INCREMENTAL_FFS_STORE:
-                PathElementComparator comparator = new PathElementComparator(preferredPathElements);
                 NodeStateEntryWriter entryWriter = new NodeStateEntryWriter(blobStore);
                 SortStrategy strategy = new IncrementalFlatFileStoreStrategy(
                         Objects.requireNonNull(indexHelper.getNodeStore().retrieve(initialCheckpoint)),
                         Objects.requireNonNull(indexHelper.getNodeStore().retrieve(finalCheckpoint)),
-                        dir, comparator, algorithm, pathPredicate, entryWriter);
+                        dir, preferredPathElements, algorithm, pathPredicate, entryWriter);
                 File result = strategy.createSortedStoreFile();
                 long entryCount = strategy.getEntryCount();
                 IncrementalStore store = new IncrementalFlatFileStore(blobStore, result,

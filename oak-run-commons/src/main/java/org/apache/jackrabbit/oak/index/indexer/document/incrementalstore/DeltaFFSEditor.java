@@ -18,12 +18,16 @@
  */
 package org.apache.jackrabbit.oak.index.indexer.document.incrementalstore;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.jackrabbit.oak.api.CommitFailedException;
 import org.apache.jackrabbit.oak.api.PropertyState;
+import org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStoreUtils;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateEntryWriter;
-import org.apache.jackrabbit.oak.index.indexer.document.incrementalstore.IncrementalFlatFileStoreStrategy;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeState;
 import org.apache.jackrabbit.oak.spi.commit.Editor;
+import org.apache.jackrabbit.oak.spi.filter.PathFilter;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
 import org.apache.jackrabbit.oak.spi.state.NodeStateUtils;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import java.util.function.Predicate;
 
 import static com.google.common.base.StandardSystemProperty.LINE_SEPARATOR;
@@ -44,7 +51,7 @@ public class DeltaFFSEditor implements Editor {
     private final IncrementalFlatFileStoreStrategy incrementalFlatFileStoreStrategy;
     private static final int LINE_SEP_LENGTH = LINE_SEPARATOR.value().length();
 
-    public DeltaFFSEditor(BufferedWriter w, NodeStateEntryWriter entryWriter, Predicate<String> predicate, IncrementalFlatFileStoreStrategy incrementalFlatFileStoreStrategy) {
+    public DeltaFFSEditor(BufferedWriter w, NodeStateEntryWriter entryWriter, Predicate<String> predicate, IncrementalFlatFileStoreStrategy incrementalFlatFileStoreStrategy) throws IOException {
         this.w = w;
         this.entryWriter = entryWriter;
         this.predicate = predicate;
@@ -114,4 +121,5 @@ public class DeltaFFSEditor implements Editor {
             log.error("Error:", exp);
         }
     }
+
 }

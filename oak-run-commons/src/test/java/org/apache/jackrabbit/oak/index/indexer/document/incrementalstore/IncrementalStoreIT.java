@@ -192,7 +192,7 @@ public class IncrementalStoreIT {
         NodeState initialNodeState = readOnlyNodeStore.retrieve(initialCheckpoint);
         NodeState finalNodeState = readOnlyNodeStore.retrieve(finalCheckpoint);
         return new IncrementalFlatFileStoreStrategy(
-                initialNodeState, finalNodeState, sortFolder.getRoot(), new PathElementComparator(preferredPathElements),
+                initialNodeState, finalNodeState, sortFolder.getRoot(), preferredPathElements,
                 Compression.NONE, pathPredicate, new NodeStateEntryWriter(fileBlobStore));
     }
 
