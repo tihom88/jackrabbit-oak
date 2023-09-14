@@ -42,7 +42,7 @@ import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFile
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileNodeStoreBuilder.OAK_INDEXER_MAX_SORT_MEMORY_IN_GB_DEFAULT;
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStoreUtils.getSortedStoreFileName;
 
-class StoreAndSortStrategy implements SortStrategy {
+public class StoreAndSortStrategy implements SortStrategy {
     private static final String OAK_INDEXER_DELETE_ORIGINAL = "oak.indexer.deleteOriginal";
     private static final int LINE_SEP_LENGTH = LINE_SEPARATOR.value().length();
 

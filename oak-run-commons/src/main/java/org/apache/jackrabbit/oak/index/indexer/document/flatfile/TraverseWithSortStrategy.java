@@ -62,7 +62,7 @@ import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFile
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStoreUtils.getSortedStoreFileName;
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStoreUtils.sizeOf;
 
-class TraverseWithSortStrategy implements SortStrategy {
+public class TraverseWithSortStrategy implements SortStrategy {
     private static final String OAK_INDEXER_MIN_MEMORY = "oak.indexer.minMemoryForWork";
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final AtomicBoolean sufficientMemory = new AtomicBoolean(true);
@@ -95,7 +95,7 @@ class TraverseWithSortStrategy implements SortStrategy {
     private Predicate<String> pathPredicate;
 
 
-    TraverseWithSortStrategy(NodeStateEntryTraverserFactory nodeStatesFactory, PathElementComparator pathComparator,
+    public TraverseWithSortStrategy(NodeStateEntryTraverserFactory nodeStatesFactory, PathElementComparator pathComparator,
                              NodeStateEntryWriter entryWriter, File storeDir, Compression algorithm, Predicate<String> pathPredicate) {
         this.nodeStatesFactory = nodeStatesFactory;
         this.entryWriter = entryWriter;

@@ -94,52 +94,6 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         this.indexerProviders = createProviders();
     }
 
-    private static class MongoNodeStateEntryTraverserFactory implements NodeStateEntryTraverserFactory {
-
-        /**
-         * This counter is part of this traverser's id and is helpful in identifying logs from different traversers that
-         * run concurrently.
-         */
-        private static final AtomicInteger traverserInstanceCounter = new AtomicInteger(0);
-        /**
-         * An prefix for ID of traversers (value is acronym for NodeStateEntryTraverser).
-         */
-        private static final String TRAVERSER_ID_PREFIX = "NSET";
-        private final RevisionVector rootRevision;
-        private final DocumentNodeStore documentNodeStore;
-        private final MongoDocumentStore documentStore;
-        private final Logger traversalLogger;
-        private final CompositeIndexer indexer;
-
-        private MongoNodeStateEntryTraverserFactory(RevisionVector rootRevision, DocumentNodeStore documentNodeStore,
-                                                    MongoDocumentStore documentStore, Logger traversalLogger, CompositeIndexer indexer) {
-            this.rootRevision = rootRevision;
-            this.documentNodeStore = documentNodeStore;
-            this.documentStore = documentStore;
-            this.traversalLogger = traversalLogger;
-            this.indexer = indexer;
-        }
-
-        @Override
-        public NodeStateEntryTraverser create(TraversingRange traversingRange) {
-            IndexingProgressReporter progressReporterPerTask =
-                    new IndexingProgressReporter(IndexUpdateCallback.NOOP, NodeTraversalCallback.NOOP);
-            String entryTraverserID = TRAVERSER_ID_PREFIX + traverserInstanceCounter.incrementAndGet();
-            //As first traversal is for dumping change the message prefix
-            progressReporterPerTask.setMessagePrefix("Dumping from " + entryTraverserID);
-            return new NodeStateEntryTraverser(entryTraverserID, rootRevision,
-                    documentNodeStore, documentStore, traversingRange)
-                    .withProgressCallback((id) -> {
-                        try {
-                            progressReporterPerTask.traversedNode(() -> id);
-                        } catch (CommitFailedException e) {
-                            throw new RuntimeException(e);
-                        }
-                        traversalLogger.trace(id);
-                    });
-        }
-    }
-
     private List<FlatFileStore> buildFlatFileStoreList(NodeState checkpointedState, CompositeIndexer indexer, Predicate<String> pathPredicate, Set<String> preferredPathElements,
             boolean splitFlatFile, Set<IndexDefinition> indexDefinitions) throws IOException {
         List<FlatFileStore> storeList = new ArrayList<>();

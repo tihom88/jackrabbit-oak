@@ -16,6 +16,7 @@
  */
 package org.apache.jackrabbit.oak.plugins.index;
 
+import org.apache.commons.logging.Log;
 import org.apache.jackrabbit.guava.common.collect.ImmutableList;
 import org.apache.commons.io.IOUtils;
 import org.apache.jackrabbit.JcrConstants;
@@ -27,6 +28,8 @@ import org.apache.jackrabbit.oak.plugins.nodetype.write.NodeTypeRegistry;
 import org.apache.jackrabbit.oak.query.AbstractQueryTest;
 import org.apache.jackrabbit.util.ISO8601;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.jcr.PropertyType;
 import java.text.ParseException;
@@ -48,6 +51,8 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 public abstract class PropertyIndexCommonTest extends AbstractQueryTest {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PropertyIndexCommonTest.class);
 
     protected IndexOptions indexOptions;
     protected TestRepository repositoryOptionsUtil;
@@ -257,6 +262,7 @@ public abstract class PropertyIndexCommonTest extends AbstractQueryTest {
         prop.setProperty(FulltextIndexConstants.PROP_TYPE, TYPENAME_DATE);
         root.commit();
 
+        LOG.info("adding content");
         Tree test = root.getTree("/").addChild("test");
         Tree a = test.addChild("a");
         Tree b = test.addChild("b");

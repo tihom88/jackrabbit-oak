@@ -21,7 +21,10 @@ package org.apache.jackrabbit.oak.index;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
@@ -65,12 +68,16 @@ public class IndexerSupport {
     protected final IndexHelper indexHelper;
     private File localIndexDir;
     private File indexDefinitions;
-    private String checkpoint;
+    private List<String> checkpoints;
     private File existingDataDumpDir;
 
     public IndexerSupport(IndexHelper indexHelper, String checkpoint) {
         this.indexHelper = indexHelper;
-        this.checkpoint = checkpoint;
+        this.checkpoints = Arrays.asList(checkpoint);
+    }
+    public IndexerSupport(IndexHelper indexHelper, List<String> checkpoints) {
+        this.indexHelper = indexHelper;
+        this.checkpoints = checkpoints;
     }
 
     public IndexerSupport withExistingDataDumpDir(File existingDataDumpDir) {
@@ -101,6 +108,20 @@ public class IndexerSupport {
     }
 
     public NodeState retrieveNodeStateForCheckpoint() {
+        String checkpoint = checkpoints.get(0);
+        NodeState checkpointedState;
+        if (HEAD_AS_CHECKPOINT.equals(checkpoint)) {
+            checkpointedState = indexHelper.getNodeStore().getRoot();
+            log.warn("Using head state for indexing. Such an index cannot be imported back");
+        } else {
+            checkpointedState = indexHelper.getNodeStore().retrieve(checkpoint);
+            checkNotNull(checkpointedState, "Not able to retrieve revision referred via checkpoint [%s]", checkpoint);
+            checkpointInfo = indexHelper.getNodeStore().checkpointInfo(checkpoint);
+        }
+        return checkpointedState;
+    }
+
+    public NodeState retrieveNodeStateForCheckpoint(String checkpoint) {
         NodeState checkpointedState;
         if (HEAD_AS_CHECKPOINT.equals(checkpoint)) {
             checkpointedState = indexHelper.getNodeStore().getRoot();

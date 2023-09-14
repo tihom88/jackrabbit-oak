@@ -56,6 +56,10 @@ public class FlatFileStore implements Iterable<NodeStateEntry>, Closeable {
         this.algorithm = algorithm;
     }
 
+    public FlatFileStore(BlobStore blobStore, File storeFile, Set<String> preferredPathElements, Compression algorithm) {
+        this(blobStore, storeFile, new NodeStateEntryReader(blobStore), preferredPathElements, algorithm);
+    }
+
     public String getFlatFileStorePath() {
         return storeFile.getParentFile().getAbsolutePath();
     }

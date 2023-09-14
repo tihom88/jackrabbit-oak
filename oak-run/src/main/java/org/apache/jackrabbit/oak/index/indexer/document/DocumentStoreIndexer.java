@@ -30,7 +30,7 @@ public class DocumentStoreIndexer extends DocumentStoreIndexerBase implements Cl
 
     private final ExtendedIndexHelper extendedIndexHelper;
 
-    public DocumentStoreIndexer(ExtendedIndexHelper extendedIndexHelper, IndexerSupport indexerSupport) throws IOException {
+    public DocumentStoreIndexer(ExtendedIndexHelper extendedIndexHelper, IndexerSupport indexerSupport, Strategy) throws IOException {
         super(extendedIndexHelper, indexerSupport);
         this.extendedIndexHelper = extendedIndexHelper;
         setProviders();
