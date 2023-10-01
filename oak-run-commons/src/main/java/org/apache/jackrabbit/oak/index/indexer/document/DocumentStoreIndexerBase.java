@@ -74,6 +74,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -222,7 +223,7 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         Set<IndexDefinition> indexDefinitions = indexerSupport.getIndexDefinitions();
         Set<String> preferredPathElements = indexerSupport.getPreferredPathElements(indexDefinitions);
         Stopwatch incrementalStoreWatch = Stopwatch.createStarted();
-        Predicate<String> predicate = indexerSupport.getFilterPredicate(indexDefinitions);
+        Predicate<String> predicate = indexerSupport.getFilterPredicate(indexDefinitions, Function.identity());
         try {
             builder = new IncrementalStoreBuilder(indexHelper.getWorkDir(), indexHelper, initialCheckpoint, finalCheckpoint)
                     .withPreferredPathElements(preferredPathElements)
@@ -250,7 +251,7 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
 
         Set<String> preferredPathElements = indexerSupport.getPreferredPathElements(indexDefinitions);
 
-        Predicate<String> predicate = indexerSupport.getFilterPredicate(indexDefinitions);
+        Predicate<String> predicate = indexerSupport.getFilterPredicate(indexDefinitions, Function.identity());
         FlatFileStore flatFileStore = buildFlatFileStoreList(checkpointedState, null, predicate,
                 preferredPathElements, IndexerConfiguration.parallelIndexEnabled(), indexDefinitions).get(0);
         log.info("FlatFileStore built at {}. To use this flatFileStore in a reindex step, set System Property-{} with value {}",

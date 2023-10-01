@@ -25,12 +25,15 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.felix.inventory.Format;
 import org.apache.jackrabbit.guava.common.base.Predicate;
 import org.apache.jackrabbit.oak.api.CommitFailedException;
 import org.apache.jackrabbit.oak.commons.PathUtils;
+import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateEntryWriter;
+import org.apache.jackrabbit.oak.index.indexer.document.flatfile.NodeStateHolder;
 import org.apache.jackrabbit.oak.plugins.index.IndexConstants;
 import org.apache.jackrabbit.oak.plugins.index.importer.AsyncLaneSwitcher;
 import org.apache.jackrabbit.oak.plugins.index.importer.IndexDefinitionUpdater;
@@ -214,7 +217,7 @@ public class IndexerSupport {
         return preferredPathElements;
     }
 
-    public Predicate<String> getFilterPredicate(Set<IndexDefinition> indexDefinitions) {
-        return s -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(s) != PathFilter.Result.EXCLUDE);
+    public <T> Predicate<T> getFilterPredicate(Set<IndexDefinition> indexDefinitions, Function<T, String> typeToString) {
+        return t -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(typeToString.apply(t)) != PathFilter.Result.EXCLUDE);
     }
 }
