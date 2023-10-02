@@ -209,6 +209,11 @@ public class IndexerSupport {
         return indexDefinitions;
     }
 
+    /**
+     *
+     * @param indexDefinitions
+     * @return set of preferred path elements referred from the given set of index definitions.
+     */
     public Set<String> getPreferredPathElements(Set<IndexDefinition> indexDefinitions) {
         Set<String> preferredPathElements = new HashSet<>();
         for (IndexDefinition indexDf : indexDefinitions) {
@@ -217,6 +222,13 @@ public class IndexerSupport {
         return preferredPathElements;
     }
 
+    /**
+     *
+     * @param indexDefinitions set of IndexDefinition to be used to calculate the Path Predicate
+     * @param typeToString Function to convert type <T> to path of type <String>
+     * @param <T>
+     * @return filter predicate based on the include/exclude path rules of the given set of index definitions.
+     */
     public <T> Predicate<T> getFilterPredicate(Set<IndexDefinition> indexDefinitions, Function<T, String> typeToString) {
         return t -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(typeToString.apply(t)) != PathFilter.Result.EXCLUDE);
     }
