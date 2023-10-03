@@ -225,11 +225,11 @@ public class IndexerSupport {
     /**
      *
      * @param indexDefinitions set of IndexDefinition to be used to calculate the Path Predicate
-     * @param typeToString Function to convert type <T> to path of type <String>
+     * @param typeToRepositoryPath Function to convert type <T> to valid repository path of type <String>
      * @param <T>
      * @return filter predicate based on the include/exclude path rules of the given set of index definitions.
      */
-    public <T> Predicate<T> getFilterPredicate(Set<IndexDefinition> indexDefinitions, Function<T, String> typeToString) {
-        return t -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(typeToString.apply(t)) != PathFilter.Result.EXCLUDE);
+    public <T> Predicate<T> getFilterPredicate(Set<IndexDefinition> indexDefinitions, Function<T, String> typeToRepositoryPath) {
+        return t -> indexDefinitions.stream().anyMatch(indexDef -> indexDef.getPathFilter().filter(typeToRepositoryPath.apply(t)) != PathFilter.Result.EXCLUDE);
     }
 }
