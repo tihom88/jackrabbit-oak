@@ -275,7 +275,9 @@ public abstract class FulltextDocumentMaker<D> implements DocumentMaker<D> {
             dirty = true;
         } else {
             if (pd.propertyIndex && pd.includePropertyType(property.getType().tag())) {
-                dirty |= addTypedFields(doc, property, pname, pd);
+                if (!pd.notNullCheckEnabled){
+                    dirty |= addTypedFields(doc, property, pname, pd);
+                }
             }
             if (!definition.isDynamicBoostLiteEnabled() && pd.dynamicBoost) {
                 try {

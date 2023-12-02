@@ -92,7 +92,7 @@ public abstract class ExcerptTest extends AbstractQueryTest {
 
         Tree allProps = properties.addChild("allProps");
 //        allProps.setProperty(FulltextIndexConstants.PROP_ANALYZED, true);
-        allProps.setProperty("name", "foo");
+//        allProps.setProperty("name", "foo");
 //        allProps.setProperty(FulltextIndexConstants.PROP_NODE_SCOPE_INDEX, true);
         allProps.setProperty(FulltextIndexConstants.PROP_PROPERTY_INDEX, true);
 //        allProps.setProperty(FulltextIndexConstants.PROP_INDEX, true);
@@ -124,6 +124,7 @@ public abstract class ExcerptTest extends AbstractQueryTest {
         String selectColumns = columns.stream().map(col -> "[" + col + "]").collect(Collectors.joining(","));
 //        String query = "SELECT " + selectColumns + " FROM [nt:base] WHERE CONTAINS(*, 'fox')";
         String query = "SELECT * FROM [nt:base] as a WHERE a.[foo] is not null";
+        String query1 = "SELECT * FROM [nt:base] as a WHERE a.[foo]='testRoot1'";
         assertEventually(() -> {
             try {
                 Result result = executeQuery(query, SQL2, NO_BINDINGS);
@@ -131,6 +132,12 @@ public abstract class ExcerptTest extends AbstractQueryTest {
                 assertTrue(resultIter.hasNext());
                 ResultRow firstRow = resultIter.next();
                 assertEquals(firstRow.getPath(), "/testRoot1");
+
+                Result result1 = executeQuery(query1, SQL2, NO_BINDINGS);
+                Iterator<? extends ResultRow> resultIter1 = result1.getRows().iterator();
+                assertFalse(resultIter1.hasNext());
+//                ResultRow firstRow1 = resultIter1.next();
+//                assertEquals(firstRow1.getPath(), "/testRoot1");
 
 //                for (String col : columns) {
 //                    PropertyValue excerptValue = firstRow.getValue(col);
