@@ -21,7 +21,6 @@ package org.apache.jackrabbit.oak.plugins.index.search.spi.editor;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -117,6 +116,8 @@ public abstract class FulltextDocumentMaker<D> implements DocumentMaker<D> {
 
     protected abstract void indexFulltextValue(D doc, String value);
 
+    protected abstract void indexNotNullRegexProperty(D doc, PropertyState ps);
+
     protected abstract void indexTypedProperty(D doc, PropertyState property, String pname, PropertyDefinition pd, int index);
 
     /**
@@ -134,6 +135,7 @@ public abstract class FulltextDocumentMaker<D> implements DocumentMaker<D> {
     protected abstract void indexAncestors(D doc, String path);
 
     protected abstract void indexNotNullProperty(D doc, PropertyDefinition pd);
+
 
     protected abstract void indexNullProperty(D doc, PropertyDefinition pd);
 
@@ -463,8 +465,15 @@ public abstract class FulltextDocumentMaker<D> implements DocumentMaker<D> {
         boolean fieldAdded = false;
         for (PropertyDefinition pd : indexingRule.getNotNullCheckEnabledProperties()) {
             if (isPropertyNotNull(state, pd)) {
-                indexNotNullProperty(doc, pd);
-                fieldAdded = true;
+                if (pd.isRegexp) {
+                    for (PropertyState ps : state.getProperties()) {
+                        indexNotNullRegexProperty(doc, ps);
+                    }
+                    fieldAdded = true;
+                } else {
+                    indexNotNullProperty(doc, pd);
+                    fieldAdded = true;
+                }
             }
         }
         return fieldAdded;
@@ -546,7 +555,12 @@ public abstract class FulltextDocumentMaker<D> implements DocumentMaker<D> {
         if (!propertyNode.exists()) {
             return false;
         }
-        return propertyNode.hasProperty(pd.nonRelativeName);
+        if (pd.isRegexp){
+            return true;
+        }
+        else {
+            return propertyNode.hasProperty(pd.nonRelativeName);
+        }
     }
 
     private static NodeState getPropertyNode(NodeState nodeState, PropertyDefinition pd) {
