@@ -430,7 +430,10 @@ public abstract class FulltextIndex implements AdvancedQueryIndex, QueryIndex, N
                     currentRowInPathIterator = it.next();
                     readCount++;
                     if (readCount % TRAVERSING_WARNING == 0) {
-                        Cursors.checkReadLimit(readCount, settings);
+                        if (!plan.getPlanName().equals("/oak:index/bootstrap")) {
+                            Cursors.checkReadLimit(readCount, settings);
+                        }
+
                         if (readCount == 2 * TRAVERSING_WARNING) {
                             log.warn("Index-Traversed {} nodes with filter {}", readCount, plan.getFilter(),
                                     new Exception("call stack"));
