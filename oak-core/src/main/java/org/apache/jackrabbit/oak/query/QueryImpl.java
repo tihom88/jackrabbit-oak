@@ -1135,7 +1135,7 @@ public class QueryImpl implements Query {
                     }
                     double c = p.getCostPerExecution() + entryCount * p.getCostPerEntry();
 
-                    if (LOG.isDebugEnabled()) {
+                    if (true || LOG.isDebugEnabled()) {
                         String plan = advIndex.getPlanDescription(p, rootState);
                         String msg = String.format("cost for [%s] of type (%s) with plan [%s] is %1.2f", p.getPlanName(), indexName, plan, c);
                         logDebug(msg);

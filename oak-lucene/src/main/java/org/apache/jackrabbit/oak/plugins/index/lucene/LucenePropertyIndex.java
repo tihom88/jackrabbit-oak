@@ -1204,7 +1204,11 @@ public class LucenePropertyIndex extends FulltextIndex {
         //If notNullCheckEnabled explicitly enabled use the simple TermQuery
         //otherwise later fallback to range query
         if (pr.isNotNullRestriction() && defn.notNullCheckEnabled) {
-            return new TermQuery(new Term(FieldNames.NOT_NULL_PROPS, defn.name));
+            if (defn.isRegexp && defn.notNullCheckEnabled) {
+                return new TermQuery(new Term(FieldNames.NOT_NULL_PROPS, pr.propertyName));
+            } else {
+                return new TermQuery(new Term(FieldNames.NOT_NULL_PROPS, defn.name));
+            }
         }
 
         switch (propType) {

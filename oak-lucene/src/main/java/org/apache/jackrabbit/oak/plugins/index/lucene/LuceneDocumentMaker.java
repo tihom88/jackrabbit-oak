@@ -140,6 +140,11 @@ public class LuceneDocumentMaker extends FulltextDocumentMaker<Document> {
     }
 
     @Override
+    protected void indexNotNullRegexProperty(Document doc, PropertyState ps) {
+        doc.add(new StringField(FieldNames.NOT_NULL_PROPS, ps.getName(), Field.Store.NO));
+    }
+
+    @Override
     protected void indexNullProperty(Document doc, PropertyDefinition pd) {
         doc.add(new StringField(FieldNames.NULL_PROPS, pd.name, Field.Store.NO));
     }

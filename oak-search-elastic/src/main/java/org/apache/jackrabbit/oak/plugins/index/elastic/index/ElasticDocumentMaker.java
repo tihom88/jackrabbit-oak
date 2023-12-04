@@ -28,6 +28,8 @@ import org.apache.jackrabbit.oak.plugins.index.search.PropertyDefinition;
 import org.apache.jackrabbit.oak.plugins.index.search.spi.binary.FulltextBinaryTextExtractor;
 import org.apache.jackrabbit.oak.plugins.index.search.spi.editor.FulltextDocumentMaker;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -130,6 +132,11 @@ public class ElasticDocumentMaker extends FulltextDocumentMaker<ElasticDocument>
                 doc.addFulltext(v);
             }
         }
+    }
+
+    @Override
+    protected void indexNotNullRegexProperty(ElasticDocument doc, PropertyState ps) {
+        // noop
     }
 
     /**
