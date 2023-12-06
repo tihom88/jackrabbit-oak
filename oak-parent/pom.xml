@@ -1315,7 +1315,13 @@
     </profile>
   </profiles>
 
-  <scm>
-    <tag>jackrabbit-oak-1.54.0</tag>
-  </scm>
+  <distributionManagement>
+    <repository>
+      <id>artifactory-dev-releases</id>
+      <name>Adobe dev Artifactory Repository</name>
+<!--    ARTIFACTORY URL from environemnt variable  -->
+      <url>${env.DEPLOY_ARTIFACTORY_URL}</url>
+
+    </repository>
+  </distributionManagement>
 </project>
