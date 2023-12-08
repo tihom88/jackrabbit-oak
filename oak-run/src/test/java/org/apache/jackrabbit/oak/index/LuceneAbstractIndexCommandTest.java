@@ -32,6 +32,9 @@ import static org.apache.jackrabbit.commons.JcrUtils.getOrCreateByPath;
 
 public class LuceneAbstractIndexCommandTest extends AbstractIndexTestCommand {
 
+    public static String BOOTSTRAP_INDEX_PATH="/oak:index/bootstrap";
+    public static String BOOTSTRAP_REGEX="^[^\\/]*$";
+
     @Override
     protected IndexRepositoryFixture getRepositoryFixture(File dir) {
         return new LuceneRepositoryFixture(dir);
@@ -57,7 +60,22 @@ public class LuceneAbstractIndexCommandTest extends AbstractIndexTestCommand {
             fooIndex.addNode("suggestion").setProperty("suggestUpdateFrequencyMinutes", 0);
         }
 
+        createBootstrapIndex(session,"nt:base", asyncIndex);
         session.save();
         session.logout();
+    }
+
+    private void createBootstrapIndex (Session session, String nodeType, boolean asyncIndex) throws RepositoryException, IOException {
+        LuceneIndexDefinitionBuilder idxBuilder = new LuceneIndexDefinitionBuilder();
+        if (!asyncIndex) {
+            idxBuilder.noAsync();
+        }
+        idxBuilder.indexRule(nodeType).property(BOOTSTRAP_REGEX, true).propertyIndex().notNullCheckEnabled();
+
+        Node bootstrapIndex = getOrCreateByPath(BOOTSTRAP_INDEX_PATH,
+                "oak:QueryIndexDefinition", session);
+        bootstrapIndex.setProperty("tags", new String[]{"bootstrap"} );
+        bootstrapIndex.setProperty("selectionPolicy", "tag");
+        idxBuilder.build(bootstrapIndex);
     }
 }

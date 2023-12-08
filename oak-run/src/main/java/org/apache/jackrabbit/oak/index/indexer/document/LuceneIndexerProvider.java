@@ -48,6 +48,10 @@ public class LuceneIndexerProvider implements NodeStateIndexerProvider {
     private final DirectoryFactory dirFactory;
     private final LuceneIndexWriterFactory indexWriterFactory;
 
+    public LuceneIndexWriterFactory getIndexWriterFactory() {
+        return indexWriterFactory;
+    }
+
     public LuceneIndexerProvider(ExtendedIndexHelper extendedIndexHelper, IndexerSupport indexerSupport) throws IOException {
         this.extendedIndexHelper = extendedIndexHelper;
         this.dirFactory = new FSDirectoryFactory(indexerSupport.getLocalIndexDir());

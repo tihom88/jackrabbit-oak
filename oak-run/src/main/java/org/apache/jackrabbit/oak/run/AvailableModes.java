@@ -21,6 +21,7 @@ package org.apache.jackrabbit.oak.run;
 
 import org.apache.jackrabbit.guava.common.collect.ImmutableMap;
 import org.apache.jackrabbit.oak.exporter.NodeStateExportCommand;
+import org.apache.jackrabbit.oak.index.BootstrapIndexCommand;
 import org.apache.jackrabbit.oak.index.IndexCommand;
 import org.apache.jackrabbit.oak.index.merge.IndexDiffCommand;
 import org.apache.jackrabbit.oak.run.commons.Command;
@@ -54,6 +55,7 @@ public final class AvailableModes {
             .put("index-merge", new IndexMergeCommand())
             .put("index-diff", new IndexDiffCommand())
             .put(IndexCommand.NAME, new IndexCommand())
+            .put(BootstrapIndexCommand.NAME, new BootstrapIndexCommand())
             .put(IOTraceCommand.NAME, new IOTraceCommand())
             .put(JsonIndexCommand.INDEX, new JsonIndexCommand())
             .put(PersistentCacheCommand.PERSISTENTCACHE, new PersistentCacheCommand())

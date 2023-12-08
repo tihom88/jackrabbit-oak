@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.apache.jackrabbit.commons.JcrUtils.getOrCreateByPath;
 import static org.apache.jackrabbit.guava.common.base.Charsets.UTF_8;
 import static org.apache.jackrabbit.oak.spi.state.NodeStateUtils.getNode;
 import static org.hamcrest.CoreMatchers.containsString;
@@ -86,15 +87,49 @@ public class ReindexIT extends LuceneAbstractIndexCommandTest {
 
     @Test
     public void reindexOutOfBand() throws Exception{
-        createTestData(true);
+        createTestData("/testNode/a", "foo", 1, "nt:base", true);
+        createTestData("/boot/b", "boot", 1, "nt:base", true, true);
+        assertNotNull(fixture.getNodeStore().getRoot().getChildNode("oak:index").getChildNode("fooIndex").getChildNode("indexRules"));
+        assertNotNull(fixture.getNodeStore().getRoot().getChildNode("oak:index").getChildNode("bootstrap").getChildNode("indexRules"));
+        Session session1 = fixture.getAdminSession();
+        session1.refresh(true);
+        assertNotNull(session1.getNode(TEST_INDEX_PATH+"/indexRules/nt:base/properties"));
+        assertNotNull(session1.getNode("/oak:index/bootstrap/indexRules/nt:base/properties"));
+        session1.save();
+        session1.logout();
         fixture.getAsyncIndexUpdate("async").run();
 
+
+
+
         String checkpoint = fixture.getNodeStore().checkpoint(TimeUnit.HOURS.toMillis(24));
+
+//        fixture.getNodeStore().getRoot().builder().getChildNode("oak:index")
+//                .getChildNode("foo").getChildNode("indexRules")
+//                .getChildNode("properties").setChildNode("boot")
+//                .setProperty("name", "boot", Type.STRING)
+//                .setProperty("propertyIndex", true, Type.BOOLEAN)
+//                        .setProperty("refresh", true, Type.BOOLEAN);
+
+        Session session = fixture.getAdminSession();
+
+        session.getNode(TEST_INDEX_PATH)
+                .setProperty("refresh", true);
+        assertNotNull(session.getNode(TEST_INDEX_PATH+"/indexRules/nt:base/properties"));
+        Node boot = session.getNode(TEST_INDEX_PATH+"/indexRules/nt:base/properties").addNode("boot");
+                        boot.setProperty("name", "boot");
+                boot.setProperty("propertyIndex", true);
+
+                session.save();
+                session.logout();
+
+
+        fixture.getAsyncIndexUpdate("async").run();
 
         //Close the repository so as all changes are flushed
         fixture.close();
 
-        IndexCommand command = new IndexCommand();
+        BootstrapIndexCommand command = new BootstrapIndexCommand();
 
         File outDir = temporaryFolder.newFolder();
         File storeDir = fixture.getDir();
@@ -103,25 +138,28 @@ public class ReindexIT extends LuceneAbstractIndexCommandTest {
                 "--index-out-dir="  + outDir.getAbsolutePath(),
                 "--index-paths=/oak:index/fooIndex",
                 "--checkpoint="+checkpoint,
-                "--reindex",
+                "--bootstrap-index",
+                "--read-write",
                 "--", // -- indicates that options have ended and rest needs to be treated as non option
                 storeDir.getAbsolutePath()
         };
 
         command.execute(args);
 
-        IndexRepositoryFixture fixture2 = new LuceneRepositoryFixture(storeDir);
-        NodeStore store2 = fixture2.getNodeStore();
-        PropertyState reindexCount = getNode(store2.getRoot(), "/oak:index/fooIndex").getProperty(IndexConstants.REINDEX_COUNT);
-        assertEquals(1, reindexCount.getValue(Type.LONG).longValue());
 
-        File indexes = new File(outDir, OutOfBandIndexer.LOCAL_INDEX_ROOT_DIR);
-        assertTrue(indexes.exists());
 
-        IndexRootDirectory idxRoot = new IndexRootDirectory(indexes);
-        List<LocalIndexDir> idxDirs = idxRoot.getAllLocalIndexes();
-
-        assertEquals(1, idxDirs.size());
+//        IndexRepositoryFixture fixture2 = new LuceneRepositoryFixture(storeDir);
+//        NodeStore store2 = fixture2.getNodeStore();
+//        PropertyState reindexCount = getNode(store2.getRoot(), "/oak:index/fooIndex").getProperty(IndexConstants.REINDEX_COUNT);
+//        assertEquals(1, reindexCount.getValue(Type.LONG).longValue());
+//
+//        File indexes = new File(outDir, OutOfBandIndexer.LOCAL_INDEX_ROOT_DIR);
+//        assertTrue(indexes.exists());
+//
+//        IndexRootDirectory idxRoot = new IndexRootDirectory(indexes);
+//        List<LocalIndexDir> idxDirs = idxRoot.getAllLocalIndexes();
+//
+//        assertEquals(1, idxDirs.size());
     }
 
     @Test

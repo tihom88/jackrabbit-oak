@@ -61,6 +61,18 @@ public abstract class AbstractIndexTestCommand {
         addTestContent(fixture, basePath, propName, count);
     }
 
+    protected void createTestData(String basePath, String propName, int count, String nodeType, boolean asyncIndex, boolean createOnlyContent)
+            throws IOException, RepositoryException {
+        if (fixture == null) {
+            this.fixture = getRepositoryFixture(temporaryFolder.newFolder());
+        }
+        if (!createOnlyContent){
+            indexIndexDefinitions();
+            createIndex(nodeType, propName, asyncIndex);
+        }
+        addTestContent(fixture, basePath, propName, count);
+    }
+
     protected void addTestContent(IndexRepositoryFixture fixture, String basePath, String propName, int count)
             throws IOException, RepositoryException {
         Session session = fixture.getAdminSession();

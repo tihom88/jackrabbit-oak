@@ -141,6 +141,9 @@ public class IndexerSupport {
     }
 
     public void switchIndexLanesAndReindexFlag(NodeStore copyOnWriteStore) throws CommitFailedException, IOException {
+        switchIndexLanesAndReindexFlag(copyOnWriteStore,true);
+    }
+    public void switchIndexLanesAndReindexFlag(NodeStore copyOnWriteStore, boolean reindexFlagValue) throws CommitFailedException, IOException {
         NodeState root = copyOnWriteStore.getRoot();
         NodeBuilder builder = root.builder();
         updateIndexDefinitions(builder);
@@ -150,7 +153,7 @@ public class IndexerSupport {
             NodeBuilder idxBuilder = childBuilder(builder, indexPath, false);
             checkState(idxBuilder.exists(), "No index definition found at path [%s]", indexPath);
 
-            idxBuilder.setProperty(IndexConstants.REINDEX_PROPERTY_NAME, true);
+            idxBuilder.setProperty(IndexConstants.REINDEX_PROPERTY_NAME, reindexFlagValue);
             AsyncLaneSwitcher.switchLane(idxBuilder, REINDEX_LANE);
         }
 

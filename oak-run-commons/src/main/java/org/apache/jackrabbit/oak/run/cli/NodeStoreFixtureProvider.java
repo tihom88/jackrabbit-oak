@@ -30,19 +30,25 @@ import com.codahale.metrics.Counting;
 import com.codahale.metrics.MetricRegistry;
 import org.apache.jackrabbit.guava.common.io.Closer;
 import org.apache.jackrabbit.guava.common.util.concurrent.MoreExecutors;
+import org.apache.jackrabbit.oak.Oak;
+import org.apache.jackrabbit.oak.api.QueryEngine;
 import org.apache.jackrabbit.oak.plugins.document.DocumentNodeStore;
 import org.apache.jackrabbit.oak.plugins.memory.MemoryNodeStore;
 import org.apache.jackrabbit.oak.plugins.metric.MetricStatisticsProvider;
+import org.apache.jackrabbit.oak.query.QueryEngineSettings;
 import org.apache.jackrabbit.oak.segment.file.InvalidFileStoreVersionException;
 import org.apache.jackrabbit.oak.spi.blob.BlobStore;
 import org.apache.jackrabbit.oak.spi.state.NodeStore;
+import org.apache.jackrabbit.oak.spi.toggle.Feature;
 import org.apache.jackrabbit.oak.spi.whiteboard.Registration;
 import org.apache.jackrabbit.oak.spi.whiteboard.Tracker;
 import org.apache.jackrabbit.oak.spi.whiteboard.Whiteboard;
+import org.apache.jackrabbit.oak.spi.whiteboard.WhiteboardUtils;
 import org.apache.jackrabbit.oak.stats.StatisticsProvider;
 
 import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
 import static java.util.Collections.emptyMap;
+import static org.apache.jackrabbit.oak.spi.toggle.Feature.newFeature;
 
 public class NodeStoreFixtureProvider {
     public static NodeStoreFixture create(Options options) throws Exception {
@@ -62,6 +68,7 @@ public class NodeStoreFixtureProvider {
 
         StatisticsProvider statisticsProvider = createStatsProvider(options, wb, closer);
         wb.register(StatisticsProvider.class, statisticsProvider, emptyMap());
+
 
         NodeStore store;
         if (commonOpts.isMemory()) {

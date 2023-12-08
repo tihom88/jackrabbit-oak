@@ -71,14 +71,17 @@ import org.junit.rules.TestRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.query.Query;
 import javax.jcr.query.QueryManager;
 import javax.jcr.query.QueryResult;
 import javax.jcr.query.Row;
+import javax.jcr.query.RowIterator;
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -140,16 +143,49 @@ public class DocumentStoreIndexerIT extends LuceneAbstractIndexCommandTest {
         }
     }
 
+    private long resultCount(QueryManager qm, String query) throws ParseException, RepositoryException {
+        long count = 0;
+        Query q = qm.createQuery(query, Query.JCR_SQL2);
+        QueryResult result = q.execute();
+        for (RowIterator it = result.getRows(); it.hasNext(); ) {
+            Row row = (Row) it.next();
+            count++;
+        }
+        return count;
+    }
+
     @Test
     public void indexMongoRepo() throws Exception {
         dns = getNodeStore();
         fixture = new LuceneRepositoryFixture(temporaryFolder.getRoot(), dns);
-        createTestData(false);
+//        createTestData(false);
+        createTestData("/testNode/a", "foo", 10, "nt:base", true);
+        createTestData("/boot/b", "boot", 10, "nt:base", true, true);
+        assertNotNull(fixture.getNodeStore().getRoot().getChildNode("oak:index").getChildNode("fooIndex").getChildNode("indexRules"));
+        assertNotNull(fixture.getNodeStore().getRoot().getChildNode("oak:index").getChildNode("bootstrap").getChildNode("indexRules"));
+        fixture.getAsyncIndexUpdate("async").run();
+        Session session = fixture.getAdminSession();
+
+        session.getNode(TEST_INDEX_PATH)
+                .setProperty("refresh", true);
+        assertNotNull(session.getNode(TEST_INDEX_PATH+"/indexRules/nt:base/properties"));
+        Node boot = session.getNode(TEST_INDEX_PATH+"/indexRules/nt:base/properties").addNode("boot");
+        boot.setProperty("name", "boot");
+        boot.setProperty("propertyIndex", true);
+
+        session.save();
+        session.logout();
+        fixture.getAsyncIndexUpdate("async").run();
+        createTestData("/boot/c", "boot", 2, "nt:base", true, true);
+        fixture.getAsyncIndexUpdate("async").run();
+
+
         String checkpoint = fixture.getNodeStore().checkpoint(TimeUnit.HOURS.toMillis(24));
+
         fixture.close();
         dns.dispose();
 
-        IndexCommand command = new IndexCommand();
+        BootstrapIndexCommand command = new BootstrapIndexCommand();
 
         File outDir = temporaryFolder.newFolder();
         String[] args = {
@@ -158,13 +194,26 @@ public class DocumentStoreIndexerIT extends LuceneAbstractIndexCommandTest {
                 "--index-paths=/oak:index/fooIndex",
                 "--doc-traversal-mode",
                 "--checkpoint=" + checkpoint,
-                "--reindex",
+                "--bootstrap-index",
+                "--fds-path=" + "/Users/mokatari/adobe/aem/j17task/jackrabbit-oak/index",
                 "--metrics",
+                "--read-write",
                 "--", // -- indicates that options have ended and rest needs to be treated as non option
                 MongoUtils.URL
         };
 
         command.execute(args);
+
+//        dns = getNodeStore();
+//        fixture = new LuceneRepositoryFixture(temporaryFolder.getRoot(), dns);
+//        Session sessionx = fixture.getAdminSession();
+//        QueryManager qm = sessionx.getWorkspace().getQueryManager();
+//        String q = "SELECT * FROM [nt:base] as a WHERE a.[boot]='bar' option (traversal fail)";
+//        long ct = resultCount(qm, q);
+//
+//        sessionx.save();
+//        sessionx.logout();
+
 
         File indexes = new File(outDir, IndexerSupport.LOCAL_INDEX_ROOT_DIR);
         assertTrue(indexes.exists());

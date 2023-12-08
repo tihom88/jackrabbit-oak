@@ -24,6 +24,9 @@ import com.mongodb.client.MongoDatabase;
 import org.apache.jackrabbit.guava.common.base.Stopwatch;
 import org.apache.jackrabbit.guava.common.io.Closer;
 import org.apache.jackrabbit.oak.api.CommitFailedException;
+import org.apache.jackrabbit.oak.api.QueryEngine;
+import org.apache.jackrabbit.oak.api.Result;
+import org.apache.jackrabbit.oak.api.ResultRow;
 import org.apache.jackrabbit.oak.commons.concurrent.ExecutorCloser;
 import org.apache.jackrabbit.oak.index.IndexHelper;
 import org.apache.jackrabbit.oak.index.IndexerSupport;
@@ -41,8 +44,12 @@ import org.apache.jackrabbit.oak.plugins.document.mongo.DocumentStoreSplitter;
 import org.apache.jackrabbit.oak.plugins.document.mongo.MongoDocumentStore;
 import org.apache.jackrabbit.oak.plugins.document.mongo.TraversingRange;
 import org.apache.jackrabbit.oak.plugins.document.util.MongoConnection;
+import org.apache.jackrabbit.oak.plugins.index.CorruptIndexHandler;
 import org.apache.jackrabbit.oak.plugins.index.FormattingUtils;
+import org.apache.jackrabbit.oak.plugins.index.IndexCommitCallback;
 import org.apache.jackrabbit.oak.plugins.index.IndexConstants;
+import org.apache.jackrabbit.oak.plugins.index.IndexEditorProvider;
+import org.apache.jackrabbit.oak.plugins.index.IndexUpdate;
 import org.apache.jackrabbit.oak.plugins.index.IndexUpdateCallback;
 import org.apache.jackrabbit.oak.plugins.index.MetricsFormatter;
 import org.apache.jackrabbit.oak.plugins.index.MetricsUtils;
@@ -50,10 +57,13 @@ import org.apache.jackrabbit.oak.plugins.index.NodeTraversalCallback;
 import org.apache.jackrabbit.oak.plugins.index.progress.IndexingProgressReporter;
 import org.apache.jackrabbit.oak.plugins.index.progress.MetricRateEstimator;
 import org.apache.jackrabbit.oak.plugins.index.search.IndexDefinition;
+import org.apache.jackrabbit.oak.plugins.memory.EmptyNodeState;
 import org.apache.jackrabbit.oak.plugins.memory.MemoryNodeStore;
 import org.apache.jackrabbit.oak.plugins.metric.MetricStatisticsProvider;
 import org.apache.jackrabbit.oak.spi.commit.CommitInfo;
+import org.apache.jackrabbit.oak.spi.commit.EditorDiff;
 import org.apache.jackrabbit.oak.spi.commit.EmptyHook;
+import org.apache.jackrabbit.oak.spi.commit.VisibleEditor;
 import org.apache.jackrabbit.oak.spi.state.NodeBuilder;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
 import org.apache.jackrabbit.oak.spi.state.NodeStateUtils;
@@ -62,10 +72,19 @@ import org.apache.jackrabbit.oak.stats.StatisticsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.jcr.RepositoryException;
+import javax.jcr.query.Query;
+import javax.jcr.query.QueryManager;
+import javax.jcr.query.QueryResult;
+import javax.jcr.query.Row;
+import javax.jcr.query.RowIterator;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -77,7 +96,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static java.util.Collections.emptyMap;
 import static org.apache.jackrabbit.guava.common.base.Preconditions.checkNotNull;
+import static org.apache.jackrabbit.oak.api.QueryEngine.NO_BINDINGS;
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileNodeStoreBuilder.OAK_INDEXER_SORTED_FILE_PATH;
 import static org.apache.jackrabbit.oak.plugins.index.IndexConstants.TYPE_PROPERTY_NAME;
 
@@ -263,6 +284,122 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
         return flatFileStore;
     }
 
+    private long resultCount(QueryManager qm, String query) throws ParseException, RepositoryException {
+        long count = 0;
+        Query q = qm.createQuery(query, Query.JCR_SQL2);
+        QueryResult result = q.execute();
+        for (RowIterator it = result.getRows(); it.hasNext(); ) {
+            Row row = (Row) it.next();
+            count++;
+        }
+        return count;
+    }
+    public void bootstrapIndex(NodeStore ns, QueryManager qm, Query q, IndexEditorProvider indexEditorProvider) throws ParseException, IOException, CommitFailedException, RepositoryException {
+        log.info("[TASK:FULL_INDEX_CREATION:START] Starting indexing job");
+        Stopwatch indexJobWatch = Stopwatch.createStarted();
+        IndexingProgressReporter progressReporter =
+                new IndexingProgressReporter(IndexUpdateCallback.NOOP, NodeTraversalCallback.NOOP);
+        configureEstimators(progressReporter);
+
+        NodeState checkpointedState = indexerSupport.retrieveNodeStateForCheckpoint();
+        NodeStore copyOnWriteStore =  ns;//.retrieve(indexerSupport.getCheckpoint());//new DocumentNodeStore()  new MemoryNodeStore(checkpointedState);
+        indexerSupport.switchIndexLanesAndReindexFlag(copyOnWriteStore, false);
+        NodeBuilder builder = copyOnWriteStore.getRoot().builder();
+        CompositeIndexer indexer = prepareIndexers(copyOnWriteStore, builder, progressReporter, false);
+        if (indexer.isEmpty()) {
+            return;
+        }
+
+        closer.register(indexer);
+
+//        List<FlatFileStore> flatFileStores = buildFlatFileStoreList(checkpointedState, indexer,
+//                indexer::shouldInclude, null, IndexerConfiguration.parallelIndexEnabled(), indexerSupport.getIndexDefinitions());
+
+        progressReporter.reset();
+
+        progressReporter.reindexingTraversalStart("/");
+
+        preIndexOperations(indexer.getIndexers());
+
+        log.info("[TASK:INDEXING:START] Starting indexing");
+        Stopwatch indexerWatch = Stopwatch.createStarted();
+
+//        if (flatFileStores.size() > 1) {
+//            indexParallel(flatFileStores, indexer, progressReporter);
+//        } else if (flatFileStores.size() == 1) {
+//            FlatFileStore flatFileStore = flatFileStores.get(0);
+//        for (NodeStateEntry entry : flatFileStore) {
+//            reportDocumentRead(entry.getPath(), progressReporter);
+//            indexer.index(entry);
+//        }
+//        }
+
+        String qx = "SELECT * FROM [nt:base] as a WHERE a.[boot]='bar' option (traversal fail)";
+        long cnt = resultCount(qm, qx);
+//        String query = "SELECT * FROM [nt:base] as a WHERE a.[boot] is not null option(index tag [bootstrap])"; //----------------------- hardcoded boot
+        QueryResult result = q.execute();
+//        Iterator<? extends ResultRow> resultIter = result.getRows().iterator();
+        IndexUpdate indexUpdate =
+                new IndexUpdate(indexEditorProvider, null, builder.getNodeState(), builder,
+                        IndexUpdateCallback.NOOP, NodeTraversalCallback.NOOP, CommitInfo.EMPTY, CorruptIndexHandler.NOOP);
+
+        List<String> ans = new LinkedList<>();
+        for (RowIterator it = result.getRows(); it.hasNext(); ) {
+            Row row = (Row) it.next();
+            String path = row.getPath();
+            ans.add(path);
+            NodeBuilder nodeBuilder = IndexerSupport.childBuilder(builder, path, false);
+            NodeStateEntry entry = new NodeStateEntry.NodeStateEntryBuilder(nodeBuilder.getNodeState(), path).build();
+            reportDocumentRead(path, progressReporter);
+//            indexer.index(entry);
+            CommitFailedException exception =
+                    EditorDiff.process(VisibleEditor.wrap(indexUpdate), EmptyNodeState.EMPTY_NODE, entry.getNodeState());
+            if (exception != null) {
+                throw exception;
+            }
+        }
+//        for ( NodeStateIndexer indexersz: indexer.getIndexers()) {
+//            indexersz.close();
+//        }
+
+        CompositeIndexer indexer1 = prepareIndexers(copyOnWriteStore, builder, progressReporter, false);
+//        ns.getRoot().com IndexCommitCallback.IndexProgress.COMMIT_SUCCEDED
+
+        String qx1 = "SELECT * FROM [nt:base] as a WHERE a.[boot]='bar' option (traversal fail)";
+        long cnt1 = resultCount(qm, qx1);
+        progressReporter.reindexingTraversalEnd();
+        progressReporter.logReport();
+        long indexingDurationSeconds = indexerWatch.elapsed(TimeUnit.SECONDS);
+        log.info("Completed the indexing in {}", FormattingUtils.formatToSeconds(indexingDurationSeconds));
+        log.info("[TASK:INDEXING:END] Metrics: {}", MetricsFormatter.newBuilder()
+                .add("duration", FormattingUtils.formatToSeconds(indexingDurationSeconds))
+                .add("durationSeconds", indexingDurationSeconds)
+                .build());
+        MetricsUtils.setCounterOnce(indexHelper.getStatisticsProvider(), METRIC_INDEXING_DURATION_SECONDS, indexingDurationSeconds);
+
+        log.info("[TASK:MERGE_NODE_STORE:START] Starting merge node store");
+        Stopwatch mergeNodeStoreWatch = Stopwatch.createStarted();
+        copyOnWriteStore.merge(builder, EmptyHook.INSTANCE, CommitInfo.EMPTY);
+        long mergeNodeStoreDurationSeconds = mergeNodeStoreWatch.elapsed(TimeUnit.SECONDS);
+        log.info("[TASK:MERGE_NODE_STORE:END] Metrics: {}", MetricsFormatter.newBuilder()
+                .add("duration", FormattingUtils.formatToSeconds(mergeNodeStoreDurationSeconds))
+                .add("durationSeconds", mergeNodeStoreDurationSeconds)
+                .build());
+        MetricsUtils.setCounterOnce(indexHelper.getStatisticsProvider(), METRIC_MERGE_NODE_STORE_DURATION_SECONDS, mergeNodeStoreDurationSeconds);
+
+        indexerSupport.postIndexWork(copyOnWriteStore);
+
+        long fullIndexCreationDurationSeconds = indexJobWatch.elapsed(TimeUnit.SECONDS);
+        log.info("[TASK:FULL_INDEX_CREATION:END] Metrics {}", MetricsFormatter.newBuilder()
+                .add("duration", FormattingUtils.formatToSeconds(fullIndexCreationDurationSeconds))
+                .add("durationSeconds", fullIndexCreationDurationSeconds)
+                .build());
+        MetricsUtils.setCounterOnce(indexHelper.getStatisticsProvider(), METRIC_FULL_INDEX_CREATION_DURATION_SECONDS, fullIndexCreationDurationSeconds);
+        String qx2 = "SELECT * FROM [nt:base] as a WHERE a.[boot]='bar' option (traversal fail)";
+        long cnt2 = resultCount(qm, qx1);
+        long test = cnt2;
+
+    }
     public void reindex() throws CommitFailedException, IOException {
         log.info("[TASK:FULL_INDEX_CREATION:START] Starting indexing job");
         Stopwatch indexJobWatch = Stopwatch.createStarted();
@@ -410,6 +547,11 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
 
     protected CompositeIndexer prepareIndexers(NodeStore copyOnWriteStore, NodeBuilder builder,
                                                IndexingProgressReporter progressReporter) {
+            return prepareIndexers(copyOnWriteStore, builder, progressReporter, true);
+    }
+
+    protected CompositeIndexer prepareIndexers(NodeStore copyOnWriteStore, NodeBuilder builder,
+                                               IndexingProgressReporter progressReporter, boolean removeOldIndexState) {
         NodeState root = copyOnWriteStore.getRoot();
         List<NodeStateIndexer> indexers = new ArrayList<>();
         for (String indexPath : indexHelper.getIndexPaths()) {
@@ -421,7 +563,9 @@ public abstract class DocumentStoreIndexerBase implements Closeable {
                 continue;
             }
 
-            removeIndexState(idxBuilder);
+            if (removeOldIndexState) {
+                removeIndexState(idxBuilder);
+            }
 
             idxBuilder.setProperty(IndexConstants.REINDEX_PROPERTY_NAME, false);
 

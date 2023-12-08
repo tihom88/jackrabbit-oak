@@ -50,6 +50,7 @@ public class IndexOptions implements OptionsBean {
     private final OptionSpec<Void> definitions;
     private final OptionSpec<Void> dumpIndex;
     private final OptionSpec<Void> reindex;
+    private final OptionSpec<Void> bootstrapIndex;
     private final OptionSpec<Void> ignoreMissingTikaDep;
     private final OptionSpec<Void> asyncIndex;
     private final OptionSpec<Void> importIndex;
@@ -100,6 +101,7 @@ public class IndexOptions implements OptionsBean {
 
         dumpIndex = parser.accepts("index-dump", "Dumps index content");
         reindex = parser.accepts("reindex", "Reindex the indexes specified by --index-paths or --index-definitions-file");
+        bootstrapIndex = parser.accepts("bootstrap-index", "Reindex the indexes specified by --index-paths or --index-definitions-file using bootstrap strategy ");
         ignoreMissingTikaDep = parser.accepts("ignore-missing-tika-dep", "Ignore when there are missing tika dependencies and continue to run");
         asyncIndex = parser.accepts("async-index", "Runs async index cycle");
 
@@ -208,6 +210,11 @@ public class IndexOptions implements OptionsBean {
     public boolean isReindex() {
         return options.has(reindex);
     }
+
+    public boolean isBootstrapIndex() {
+        return options.has(bootstrapIndex);
+    }
+
 
     public boolean isIgnoreMissingTikaDep() {
         return options.has(ignoreMissingTikaDep);
