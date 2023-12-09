@@ -49,12 +49,18 @@ public class ElasticIndexerProvider implements NodeStateIndexerProvider {
     private final IndexHelper indexHelper;
     private final ElasticIndexWriterFactory indexWriterFactory;
     private final ElasticConnection connection;
+    private final Boolean reindex;
 
     public ElasticIndexerProvider(IndexHelper indexHelper, ElasticConnection connection) {
+        this(indexHelper, connection, true);
+    }
+
+    public ElasticIndexerProvider(IndexHelper indexHelper, ElasticConnection connection, Boolean reindex) {
         this.indexHelper = indexHelper;
         this.indexWriterFactory = new ElasticIndexWriterFactory(connection,
                 new ElasticIndexTracker(connection, new ElasticMetricHandler(StatisticsProvider.NOOP)));
         this.connection = connection;
+        this.reindex = reindex;
     }
 
 
@@ -66,9 +72,9 @@ public class ElasticIndexerProvider implements NodeStateIndexerProvider {
         ElasticIndexDefinition idxDefinition = (ElasticIndexDefinition) new ElasticIndexDefinition.Builder(connection.getIndexPrefix()).
                 root(root).indexPath(indexPath).defn(definition.getNodeState()).reindex().build();
 
-        FulltextIndexWriter<ElasticDocument> indexWriter = indexWriterFactory.newInstance(idxDefinition, definition, CommitInfo.EMPTY, true);
-        FulltextBinaryTextExtractor textExtractor = new FulltextBinaryTextExtractor(textCache, idxDefinition, true);
-
+        FulltextIndexWriter<ElasticDocument> indexWriter = indexWriterFactory.newInstance(idxDefinition, definition, CommitInfo.EMPTY, reindex);
+        //FulltextBinaryTextExtractor textExtractor = new FulltextBinaryTextExtractor(textCache, idxDefinition, true);
+        FulltextBinaryTextExtractor textExtractor = null;
         ElasticIndexTracker indexTracker = new ElasticIndexTracker(connection, new ElasticMetricHandler(StatisticsProvider.NOOP));
         ElasticIndexEditorProvider elasticIndexEditorProvider = new ElasticIndexEditorProvider(indexTracker, connection, null);
         return new ElasticIndexer(idxDefinition, textExtractor, definition, progressReporter, indexWriter, elasticIndexEditorProvider, indexHelper);

@@ -43,7 +43,7 @@ import org.apache.jackrabbit.oak.spi.state.NodeStore;
 import static org.apache.jackrabbit.guava.common.base.Preconditions.checkNotNull;
 import static java.util.Collections.singletonList;
 
-final class NodeStoreUtils {
+public final class NodeStoreUtils {
 
     static void mergeWithConcurrentCheck(NodeStore nodeStore, NodeBuilder builder) throws CommitFailedException {
         CompositeHook hooks = new CompositeHook(
@@ -54,8 +54,8 @@ final class NodeStoreUtils {
         nodeStore.merge(builder, hooks, createCommitInfo());
     }
 
-    static void mergeWithConcurrentCheck(NodeStore nodeStore, NodeBuilder builder,
-                                         IndexEditorProvider indexEditorProvider) throws CommitFailedException {
+    public static void mergeWithConcurrentCheck(NodeStore nodeStore, NodeBuilder builder,
+                                                IndexEditorProvider indexEditorProvider) throws CommitFailedException {
         CompositeHook hooks = new CompositeHook(
                 ResetCommitAttributeHook.INSTANCE,
                 new EditorHook(new IndexUpdateProvider(indexEditorProvider, null, true)),
