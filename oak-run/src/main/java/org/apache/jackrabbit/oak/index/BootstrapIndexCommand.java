@@ -44,17 +44,22 @@ import org.apache.jackrabbit.oak.index.indexer.document.NodeStateEntry;
 import org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileStore;
 import org.apache.jackrabbit.oak.plugins.document.util.MongoConnection;
 import org.apache.jackrabbit.oak.plugins.index.AsyncIndexUpdate;
+import org.apache.jackrabbit.oak.plugins.index.CompositeIndexEditorProvider;
+import org.apache.jackrabbit.oak.plugins.index.CorruptIndexHandler;
 import org.apache.jackrabbit.oak.plugins.index.IndexEditorProvider;
+import org.apache.jackrabbit.oak.plugins.index.IndexUpdate;
 import org.apache.jackrabbit.oak.plugins.index.IndexUpdateCallback;
 import org.apache.jackrabbit.oak.plugins.index.NodeTraversalCallback;
 import org.apache.jackrabbit.oak.plugins.index.counter.NodeCounterEditorProvider;
 import org.apache.jackrabbit.oak.plugins.index.importer.IndexDefinitionUpdater;
+import org.apache.jackrabbit.oak.plugins.index.importer.NodeStoreUtils;
 import org.apache.jackrabbit.oak.plugins.index.lucene.IndexCopier;
 import org.apache.jackrabbit.oak.plugins.index.lucene.IndexTracker;
 import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexDefinition;
 import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexEditorProvider;
 import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProvider;
 import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexWriterFactory;
+import org.apache.jackrabbit.oak.plugins.index.lucene.directory.LuceneIndexImporter;
 import org.apache.jackrabbit.oak.plugins.index.lucene.reader.DefaultIndexReaderFactory;
 import org.apache.jackrabbit.oak.plugins.index.lucene.writer.LuceneIndexWriter;
 import org.apache.jackrabbit.oak.plugins.index.nodetype.NodeTypeIndexProvider;
@@ -62,9 +67,12 @@ import org.apache.jackrabbit.oak.plugins.index.progress.IndexingProgressReporter
 import org.apache.jackrabbit.oak.plugins.index.progress.MetricRateEstimator;
 import org.apache.jackrabbit.oak.plugins.index.property.PropertyIndexEditorProvider;
 import org.apache.jackrabbit.oak.plugins.index.property.PropertyIndexProvider;
+import org.apache.jackrabbit.oak.plugins.index.reference.ReferenceEditorProvider;
+import org.apache.jackrabbit.oak.plugins.index.reference.ReferenceIndexProvider;
 import org.apache.jackrabbit.oak.plugins.index.search.ExtractedTextCache;
 import org.apache.jackrabbit.oak.plugins.index.search.spi.binary.FulltextBinaryTextExtractor;
 import org.apache.jackrabbit.oak.plugins.index.search.util.NodeStateCopyUtils;
+import org.apache.jackrabbit.oak.plugins.memory.EmptyNodeState;
 import org.apache.jackrabbit.oak.plugins.metric.MetricStatisticsProvider;
 import org.apache.jackrabbit.oak.query.QueryEngineImpl;
 import org.apache.jackrabbit.oak.query.QueryEngineSettings;
@@ -77,7 +85,10 @@ import org.apache.jackrabbit.oak.run.cli.NodeStoreFixtureProvider;
 import org.apache.jackrabbit.oak.run.cli.Options;
 import org.apache.jackrabbit.oak.run.commons.Command;
 import org.apache.jackrabbit.oak.run.commons.LoggingInitializer;
+import org.apache.jackrabbit.oak.spi.commit.CommitInfo;
+import org.apache.jackrabbit.oak.spi.commit.EditorDiff;
 import org.apache.jackrabbit.oak.spi.commit.Observer;
+import org.apache.jackrabbit.oak.spi.commit.VisibleEditor;
 import org.apache.jackrabbit.oak.spi.query.QueryIndexProvider;
 import org.apache.jackrabbit.oak.spi.security.OpenSecurityProvider;
 import org.apache.jackrabbit.oak.spi.security.SecurityProvider;
@@ -108,6 +119,7 @@ import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -125,6 +137,7 @@ import static org.apache.jackrabbit.guava.common.collect.Lists.newArrayList;
 import static org.apache.jackrabbit.oak.api.QueryEngine.NO_BINDINGS;
 import static org.apache.jackrabbit.oak.index.indexer.document.flatfile.FlatFileNodeStoreBuilder.OAK_INDEXER_SORTED_FILE_PATH;
 import static org.apache.jackrabbit.oak.plugins.index.CompositeIndexEditorProvider.compose;
+import static org.apache.jackrabbit.oak.plugins.index.importer.NodeStoreUtils.mergeWithConcurrentCheck;
 
 public class BootstrapIndexCommand implements Command {
     private static final Logger log = LoggerFactory.getLogger(BootstrapIndexCommand.class);
@@ -176,6 +189,8 @@ public class BootstrapIndexCommand implements Command {
 
     @Override
     public void execute(String... args) throws Exception {
+
+
         OptionParser parser = new OptionParser();
 
         opts = new Options();
@@ -206,9 +221,9 @@ public class BootstrapIndexCommand implements Command {
 
         boolean success = false;
 //        NodeStoreFixture fixture;
+        Closer closer = Closer.create();
         try {
             if (indexOpts.isBootstrapIndex()) {
-                Closer closer = Closer.create();
                 /*
 
                 NodeStoreFixture fixturex = NodeStoreFixtureProvider.create(opts);
@@ -269,10 +284,12 @@ public class BootstrapIndexCommand implements Command {
 //--------------------------
                 System.out.println("creating nodestorefixture");
                 NodeStoreFixture fixture = NodeStoreFixtureProvider.create(opts);
+                closer.register(fixture);
                 System.out.println("created nodestorefixture");
                 IndexCopier copier = null;
                 try {
                     copier = new IndexCopier(executorService, indexOpts.getWorkDir());
+                    closer.register(copier);
                 } catch (IOException e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -287,7 +304,9 @@ public class BootstrapIndexCommand implements Command {
 //                 optionalEditorProvider = new TestUtil.OptionalEditorProvider();
 //                 asyncIndexUpdate.setCorruptIndexHandler(trackingCorruptIndexHandler);
                 SecurityProvider securityProvider = new OpenSecurityProvider();
-                IndexEditorProvider indexEditorProvider = new PropertyIndexEditorProvider();
+                IndexEditorProvider pIndexEditorProvider = new PropertyIndexEditorProvider();
+                IndexEditorProvider indexEditorProvider = new CompositeIndexEditorProvider(pIndexEditorProvider, new ReferenceEditorProvider(), new LuceneIndexEditorProvider(copier));
+
                 QueryIndexProvider nodeTypeIndexProvider = new NodeTypeIndexProvider();
                 QueryIndexProvider propertyIndexProvider = new PropertyIndexProvider();
                 //QueryIndexProvider luceneIndexProvider = new LuceneIndexProvider();
@@ -298,6 +317,7 @@ public class BootstrapIndexCommand implements Command {
 //                         .with(resultCountingIndexProvider)
                         .with((Observer) indexProvider)
                         .with((QueryIndexProvider) indexProvider)
+                        .with(new ReferenceIndexProvider())
                         .with(editorProvider)
 //                         .with(optionalEditorProvider)
                         .with(indexEditorProvider)
@@ -307,7 +327,6 @@ public class BootstrapIndexCommand implements Command {
                 ContentRepository repository = oak.createContentRepository();
                 System.out.println("created oak");
 
-                Whiteboard wb = fixture.getWhiteboard();
                 @NotNull ContentSession session = repository.login(null, null);
                 @NotNull Root root = session.getLatestRoot();
                 @NotNull QueryEngine qe = root.getQueryEngine();
@@ -319,7 +338,8 @@ public class BootstrapIndexCommand implements Command {
 
 //                 LuceneIndexDefinition idxDefinition = LuceneIndexDefinition.newBuilder(root, definition.getNodeState(), indexPath).reindex().build();
 //                 LuceneIndexDefinition idxDefinition = new LuceneIndexDefinition.Builder().(root, definition.getNodeState(), indexPath).reindex().build();
-                NodeBuilder idxBuilder = IndexerSupport.childBuilder(fixture.getStore().getRoot().builder(), indexOpts.getIndexPaths().get(0), false);
+                NodeBuilder rootBuilder = fixture.getStore().getRoot().builder();
+                NodeBuilder idxBuilder = IndexerSupport.childBuilder(rootBuilder, indexOpts.getIndexPaths().get(0), false);
                 LuceneIndexDefinition idxDefinition = new LuceneIndexDefinition(fixture.getStore().getRoot(),
                         idxBuilder.getNodeState(), indexOpts.getIndexPaths().get(0)); //---------------------- working on one index only
 
@@ -359,15 +379,66 @@ public class BootstrapIndexCommand implements Command {
                 Result result = qe.executeQuery(query, "JCR-SQL2", NO_BINDINGS, emptyMap());
                 Iterator<? extends ResultRow> resultIter = result.getRows().iterator();
                 List<String> ans = new LinkedList<>();
-                for (ResultRow row : result.getRows()) {
-                    String path = row.getPath();
+                List<String> paths = Arrays.asList("/tmp/content/dam/newNode2");
+                for (String path : paths) {
+                    //String path = row.getPath();
                     ans.add(path);
                     NodeBuilder nodeBuilder = IndexerSupport.childBuilder(fixture.getStore().getRoot().builder(), path, false);
                     luceneIndexer.index(
                             new NodeStateEntry.NodeStateEntryBuilder(nodeBuilder.getNodeState(), path).build());
                     System.out.println("nodes from querycount:" + ans.size());
                 }
+
+                luceneIndexer.close();
+
+                NodeStoreUtils.mergeWithConcurrentCheck(fixture.getStore(),rootBuilder , indexEditorProvider);
+
+                root = session.getLatestRoot();
+                qe = root.getQueryEngine();
+
+
+                String testQuery = "SELECT * FROM [nt:base] where boot='a'";
+                System.out.println("executing test query");
+                result = qe.executeQuery(testQuery, "JCR-SQL2", NO_BINDINGS, emptyMap());
+                for (ResultRow row : result.getRows()) {
+                    String path = row.getPath();
+                    System.out.println(path);
+                }
+
+
+
+               /* IndexUpdate indexUpdate =
+                        new IndexUpdate(indexEditorProvider, "async", rootBuilder.getNodeState(), rootBuilder,
+                                IndexUpdateCallback.NOOP, NodeTraversalCallback.NOOP, CommitInfo.EMPTY, CorruptIndexHandler.NOOP);
+
+                List<String> ans = new LinkedList<>();
+                for (ResultRow row:result.getRows()) {
+                    //Row row = (Row) it.next();
+                    String path = row.getPath();
+                    ans.add(path);
+                    NodeBuilder nodeBuilder = IndexerSupport.childBuilder(rootBuilder, path, false);
+                    NodeStateEntry entry = new NodeStateEntry.NodeStateEntryBuilder(nodeBuilder.getNodeState(), path).build();
+                    //reportDocumentRead(path, progressReporter);
+//            indexer.index(entry);
+                    CommitFailedException exception =
+                            EditorDiff.process(VisibleEditor.wrap(indexUpdate), EmptyNodeState.EMPTY_NODE, entry.getNodeState());
+                    if (exception != null) {
+                        throw exception;
+                    }
+                }*/
+                System.out.println("size --" + ans.size());
                 System.out.println("indexing done");
+
+                //indexerSupport.copyIndexFilesToOutput();
+
+                System.out.println("starting import");
+
+                LuceneIndexImporter importer = new LuceneIndexImporter();
+                importer.importIndex(fixture.getStore().getRoot(), idxBuilder, new File("/Users/nitigup/quickstart/author/test-2/socialLucene4-1702093578015"));
+                NodeStoreUtils.mergeWithConcurrentCheck(fixture.getStore(),rootBuilder , indexEditorProvider);
+                System.out.println(" import ended...");
+                NodeStoreUtils.mergeWithConcurrentCheck(fixture.getStore(),rootBuilder , indexEditorProvider);
+                //NodeStoreUtils.mergeWithConcurrentCheck(fixture.getStore(),rootBuilder , indexEditorProvider);
                 /*
                 long count1 = resultCount(qe, "SELECT * FROM [nt:base] as a WHERE a.[boot]='bar' option (traversal fail)");
                 if (count1 == 0){
@@ -388,13 +459,11 @@ public class BootstrapIndexCommand implements Command {
 
 //                asyncIndexerService.execute();
             } else {
-                try (Closer closer = Closer.create()) {
                     configureCustomizer(opts, closer, true);
                     NodeStoreFixture fixture = NodeStoreFixtureProvider.create(opts);
                     closer.register(fixture);
                     execute(fixture, indexOpts, closer);
                     tellReportPaths();
-                }
             }
             success = true;
         } catch (Throwable e) {
@@ -404,7 +473,10 @@ public class BootstrapIndexCommand implements Command {
                 throw e;
             }
         } finally {
+            closer.close();
+            System.out.println("in finally...");
             shutdownLogging();
+            System.out.println("ended...");
         }
 
         if (!success) {

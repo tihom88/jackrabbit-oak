@@ -63,6 +63,9 @@ public class IndexOptions implements OptionsBean {
     protected final Set<OptionSpec> actionOpts;
     private final OptionSpec<String> indexPaths;
     private final OptionSpec<String> checkpoint;
+    private final OptionSpec<String> sourceIndex;
+    private final OptionSpec<String> destIndex;
+    private final OptionSpec<String> propAddFilePath;
     private final OptionSpec<String> asyncIndexLanes;
     private final Set<String> operationNames;
     private final OptionSpec<File> existingDataDumpDirOpt;
@@ -90,6 +93,9 @@ public class IndexOptions implements OptionsBean {
                 "indexing in read only mode. For testing purpose, it can be set to 'head' to indicate that the head " +
                 "state should be used.")
                 .withRequiredArg().ofType(String.class);
+        sourceIndex = parser.accepts("source-index").withRequiredArg().ofType(String.class);
+        destIndex = parser.accepts("dest-index").withRequiredArg().ofType(String.class);
+        propAddFilePath = parser.accepts("prop-additions-file").withRequiredArg().ofType(String.class);
 
         consistencyCheck = parser.accepts("index-consistency-check", "Performs consistency check " +
                 "for indexes as specified by --index-paths (if this not set, all indexes are checked). Currently " +
@@ -226,6 +232,18 @@ public class IndexOptions implements OptionsBean {
 
     public boolean isImportIndex() {
         return options.has(importIndex);
+    }
+
+    public String getSourceIndex() {
+        return sourceIndex.value(options);
+    }
+
+    public String getDestIndex() {
+        return destIndex.value(options);
+    }
+
+    public String getPropAddFilePath() {
+        return propAddFilePath.value(options);
     }
 
     public boolean isDocTraversalMode() {

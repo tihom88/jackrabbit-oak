@@ -19,6 +19,7 @@
 package org.apache.jackrabbit.oak.run;
 
 import org.apache.jackrabbit.guava.common.collect.ImmutableMap;
+import org.apache.jackrabbit.oak.index.BootstrapIndexCommand;
 import org.apache.jackrabbit.oak.index.ElasticIndexCommand;
 import org.apache.jackrabbit.oak.index.ElasticPurgeOldIndexVersionCommand;
 import org.apache.jackrabbit.oak.run.commons.Command;
@@ -33,5 +34,6 @@ public final class AvailableElasticModes {
             ImmutableMap.<String, Command>builder()
                     .put("index", new ElasticIndexCommand())
                     .put("purge-index-versions", new ElasticPurgeOldIndexVersionCommand())
+                    .put("bootstrap-index", new BootstrapIndexCommand())
                     .build());
 }
