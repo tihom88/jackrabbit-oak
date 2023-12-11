@@ -135,7 +135,7 @@ public class BootstrapIndexCommand implements Command {
         opts.registerOptionsFactory(IndexOptions.FACTORY);
         opts.parseAndConfigure(parser, args);
 
-        indexOpts = opts.getOptionBean(IndexOptions.class);
+        indexOpts = opts.getOptionBean(ElasticIndexOptions.class);
         setupLogging(indexOpts);
 
         logCliArgs(args);
@@ -144,10 +144,10 @@ public class BootstrapIndexCommand implements Command {
         Closer closer = Closer.create();
         try {
             if (indexOpts.isBootstrapIndex()) {
-                System.out.println("creating nodestorefixture");
+                System.out.println("Starting to execute bootstrap indexing command.");
                 NodeStoreFixture fixture = NodeStoreFixtureProvider.create(opts);
                 closer.register(fixture);
-                System.out.println("created nodestorefixture");
+                //System.out.println("created nodestorefixture");
 
                 ElasticConnection esConn = ElasticConnection.newBuilder().withIndexPrefix("oak-elastic").withConnectionParameters("http", "localhost", 9200).build();
 
@@ -179,7 +179,7 @@ public class BootstrapIndexCommand implements Command {
                 QueryIndexProvider nodeTypeIndexProvider = new NodeTypeIndexProvider();
                 QueryIndexProvider propertyIndexProvider = new PropertyIndexProvider();
 
-                System.out.println("creating oak");
+                //System.out.println("creating oak");
                 Oak oak = new Oak(fixture.getStore())
                         .with(securityProvider)
                         .with(indexProvider)
@@ -191,7 +191,7 @@ public class BootstrapIndexCommand implements Command {
                         .with(nodeTypeIndexProvider)
                         .with(queryEngineSettings);
                 ContentRepository repository = oak.createContentRepository();
-                System.out.println("created oak");
+                //System.out.println("created oak");
 
                 @NotNull ContentSession session = repository.login(null, null);
                 @NotNull Root root = session.getLatestRoot();
@@ -209,35 +209,41 @@ public class BootstrapIndexCommand implements Command {
                 configureEstimators(extendedIndexHelper, progressReporter);
                 progressReporter.registerIndex(targetIndexNameStr, false, 0); //-----------------working on one index only
 
-                System.out.println("created elastic indexer");
+                //System.out.println("created elastic indexer");
 
                 Set<String> pathsToUpdate = new HashSet<>();
+                long start = System.currentTimeMillis();
 
                 for (String rule : propAdditions.keySet()) {
                     for (String addedProp : propAdditions.get(rule)) {
+                        // TODO : make this query for all properties being added instead of multiple queries.
                         String query = "SELECT * FROM [" + rule + "] as a WHERE a.[" + addedProp+ "] is not null option(index tag [bootstrap])";
-                        System.out.println("executing query" + query);
+                        System.out.println("Executing Query" + query + " to get results from bootstrap index.");
                         Result result = qe.executeQuery(query, "JCR-SQL2", NO_BINDINGS, emptyMap());
                         int count = 0;
                         for (ResultRow row : result.getRows()) {
                             String path = row.getPath();
-                            pathsToUpdate.add(path);
+                            System.out.println("Updating index for path " + path);
+                            NodeBuilder nodeBuilder = IndexerSupport.childBuilder(fixture.getStore().getRoot().builder(), path, false);
+                            elasticIndexer.index(
+                                    new NodeStateEntry.NodeStateEntryBuilder(nodeBuilder.getNodeState(), path).build());
+
+                            //pathsToUpdate.add(path);
                             count++;
                         }
-                        System.out.println("Query result count" + count);
+                        System.out.println("Number of nodes updated using bootstrap indexing process - " + count);
                     }
                 }
-                System.out.println("Total paths to be updated in index" + pathsToUpdate);
-                long start = System.currentTimeMillis();
-                for (String path : pathsToUpdate) {
+                //System.out.println("Total paths to be updated in index" + pathsToUpdate.size());
+                /*for (String path : pathsToUpdate) {
                     NodeBuilder nodeBuilder = IndexerSupport.childBuilder(fixture.getStore().getRoot().builder(), path, false);
                     elasticIndexer.index(
                             new NodeStateEntry.NodeStateEntryBuilder(nodeBuilder.getNodeState(), path).build());
-                }
+                }*/
                 elasticIndexer.close();
-                System.out.println("Time taken in indexing " + (System.currentTimeMillis() - start));
+                System.out.println("Time taken to index using bootstrap process " + (System.currentTimeMillis() - start));
 
-                System.out.println("indexing done");
+                //System.out.println("indexing done");
             }
             success = true;
         } catch (Throwable e) {
@@ -248,9 +254,9 @@ public class BootstrapIndexCommand implements Command {
             }
         } finally {
             closer.close();
-            System.out.println("in finally...");
+            //System.out.println("in finally...");
             shutdownLogging();
-            System.out.println("ended...");
+            //System.out.println("ended...");
         }
         System.exit(1);
         /*if (!success) {
@@ -275,7 +281,7 @@ public class BootstrapIndexCommand implements Command {
 
 
         long start = System.currentTimeMillis();
-        System.out.println("Starting to clone");
+        //System.out.println("Starting to clone index : " + existingIndexPath);
         // Block write on index to be cloned
         IndexSettingBlocks indexSettingBlocks = new IndexSettingBlocks.Builder().write(true).build();
         IndexSettings idxSettings = new IndexSettings.Builder().blocks(indexSettingBlocks).build();
@@ -283,7 +289,8 @@ public class BootstrapIndexCommand implements Command {
         esConn.getClient().indices().putSettings(putIndicesSettingsRequest);
         /// TODO : need to block elastic-async lane as well.
         esConn.getClient().indices().clone(new CloneIndexRequest.Builder().index(remoteSourceIndexName).target(remoteTargetIndexName).build());
-        System.out.println("Time in cloning - " + (System.currentTimeMillis() - start));
+        System.out.println("Cloned Index from " + existingIndexPath + " to " + newIndexPath);
+        System.out.println("Time to clone - " + (System.currentTimeMillis() - start));
 
 
         // Revert block write on both source and copied index
@@ -293,7 +300,7 @@ public class BootstrapIndexCommand implements Command {
         esConn.getClient().indices().putSettings(putIndicesSettingsRequest);
 
 
-        System.out.println("Starting to update mapping");
+        //System.out.println("Starting to update mapping");
 
         // Update mapping
         Property property = new Property.Builder().keyword(b1 -> b1.ignoreAbove(256)).build();
@@ -354,7 +361,7 @@ public class BootstrapIndexCommand implements Command {
         NodeState parent = root;
         NodeState state = null;
         for (String pathElement : PathUtils.elements(path)) {
-            System.out.println("Getting source state - " + pathElement);
+            //System.out.println("Getting source state - " + pathElement);
             state = parent.getChildNode(pathElement);
             parent = state;
         }
@@ -365,7 +372,7 @@ public class BootstrapIndexCommand implements Command {
         NodeBuilder parentBuilder = rootBuilder;
         NodeBuilder builder = null;
         for (String pathElement: PathUtils.elements(path)) {
-            System.out.println("Getting dest builder - " + path);
+            //System.out.println("Getting dest builder - " + path);
             builder = parentBuilder.child(pathElement);
             parentBuilder = builder;
         }
