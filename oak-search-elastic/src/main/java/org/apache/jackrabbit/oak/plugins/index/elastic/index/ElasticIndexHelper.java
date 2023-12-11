@@ -23,6 +23,7 @@ import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.elasticsearch.indices.IndexSettings;
 import co.elastic.clients.elasticsearch.indices.IndexSettingsAnalysis;
+import co.elastic.clients.elasticsearch.indices.MappingLimitSettingsTotalFields;
 import co.elastic.clients.elasticsearch.indices.PutIndicesSettingsRequest;
 import co.elastic.clients.json.JsonData;
 import co.elastic.clients.util.ObjectBuilder;
@@ -184,12 +185,11 @@ class ElasticIndexHelper {
         analyzerBuilder.analyzer("trigram",
                 ab -> ab.custom(
                         customAnalyzer -> customAnalyzer.tokenizer("standard").filter("lowercase", "shingle")));
-
         // set up the index
         builder.index(indexBuilder -> indexBuilder
                         // Make the index more lenient when a field cannot be converted to the mapped type. Without this setting
                         // the entire document will fail to update. Instead, only the specific field won't be updated.
-                        .mapping(mf -> mf.ignoreMalformed(true))
+                        .mapping(mf -> mf.ignoreMalformed(true).totalFields(new MappingLimitSettingsTotalFields.Builder().limit(50000).build()))
                         // static setting: cannot be changed after the index gets created
                         .numberOfShards(Integer.toString(indexDefinition.numberOfShards))
                         // dynamic settings: see #enableIndexRequest
