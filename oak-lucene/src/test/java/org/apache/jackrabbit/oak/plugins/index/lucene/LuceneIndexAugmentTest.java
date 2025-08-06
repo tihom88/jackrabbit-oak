@@ -210,7 +210,7 @@ public class LuceneIndexAugmentTest extends AbstractQueryTest {
         TopDocs docs = searcher.search(new TermQuery(new Term("barbar", "1")), 10);
         ScoreDoc[] scoreDocs = docs.scoreDocs;
         assertEquals("Number of results should be 1", 1, scoreDocs.length);
-        Document doc = searcher.doc(scoreDocs[0].doc);
+        Document doc = searcher.storedFields().document(scoreDocs[0].doc);
         String path = doc.get(":path");
         assertEquals("/test/item", path);
     }
