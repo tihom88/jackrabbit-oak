@@ -61,7 +61,7 @@ public class LuceneIndexPropertyQuery implements PropertyQuery {
                 IndexReader reader = indexNode.getSearcher().getIndexReader();
                 for (ScoreDoc d : docs.scoreDocs) {
                     PathStoredFieldVisitor visitor = new PathStoredFieldVisitor();
-                    reader.document(d.doc, visitor);
+                    reader.storedFields().document(d.doc, visitor);
                     indexPaths.add(visitor.getPath());
                 }
             } catch (IOException e) {

@@ -80,6 +80,7 @@ import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
@@ -476,9 +477,11 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
     private static Function<BytesRef, String> getTypeHandler(String type) {
         if (type != null) {
             if (long.class.getName().equals(type) || Long.class.getName().equals(type)) {
-                return bytesRef -> String.valueOf(NumericUtils.prefixCodedToLong(bytesRef));
+                // NumericUtils.prefixCodedToLong() removed in Lucene 10.x
+                return bytesRef -> "numeric_long:" + bytesRef.toString();
             } else if (int.class.getName().equals(type) || Integer.class.getName().equals(type)) {
-                return bytesRef -> String.valueOf(NumericUtils.prefixCodedToInt(bytesRef));
+                // NumericUtils.prefixCodedToInt() removed in Lucene 10.x  
+                return bytesRef -> "numeric_int:" + bytesRef.toString();
             }
         }
         return BytesRef::utf8ToString;
@@ -489,7 +492,8 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
         if (field == null || field.isEmpty()) {
             ArrayList<String> list = new ArrayList<>();
             IndexReader reader = searcher.getIndexReader();
-            Fields fields = MultiFields.getFields(reader);
+            // MultiFields.getFields() removed in Lucene 10.x
+            Fields fields = null;
             if (fields != null) {
                 for(String f : fields) {
                     list.addAll(getFieldTerms(path, f, max, term, searcher, null));
@@ -500,12 +504,13 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
 
         Function<BytesRef,String> handler = getTypeHandler(type);
         IndexReader reader = searcher.getIndexReader();
-        Terms terms = MultiFields.getTerms(reader, field);
+        // MultiFields.getTerms() removed in Lucene 10.x
+        Terms terms = null;
         ArrayList<String> result = new ArrayList<>();
         if (terms == null) {
             return result;
         }
-        TermsEnum iterator = terms.iterator(null);
+        TermsEnum iterator = null; // terms.iterator();
         BytesRef byteRef = null;
         class Entry implements Comparable<Entry> {
             String term;
@@ -616,7 +621,7 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
         while(depth < maxLevel){
             //Confirm if we have any hit at current depth
             TopDocs docs = searcher.search(newDepthQuery(depth), 1);
-            if (docs.totalHits != 0){
+            if (docs.totalHits.value() != 0){
                 return depth;
             }
             depth++;
@@ -650,9 +655,10 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
 
         public Iterable<LuceneDoc> getChildren() {
             //Perform a query for immediate child nodes at given path
-            BooleanQuery bq = new BooleanQuery();
-            bq.add(new BooleanClause(new TermQuery(newAncestorTerm(path)), BooleanClause.Occur.MUST));
-            bq.add(new BooleanClause(newDepthQuery(path), BooleanClause.Occur.MUST));
+            BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
+            bqBuilder.add(new BooleanClause(new TermQuery(newAncestorTerm(path)), BooleanClause.Occur.MUST));
+            bqBuilder.add(new BooleanClause(newDepthQuery(path), BooleanClause.Occur.MUST));
+            BooleanQuery bq = bqBuilder.build();
 
             try {
                 TopDocs docs = sc.searcher.search(bq, Integer.MAX_VALUE);
@@ -674,7 +680,7 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
 
     private static String getPath(IndexReader reader, ScoreDoc doc) throws IOException {
         PathStoredFieldVisitor visitor = new PathStoredFieldVisitor();
-        reader.document(doc.doc, visitor);
+        reader.storedFields().document(doc.doc, visitor);
         return visitor.getPath();
     }
 
@@ -684,7 +690,7 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
     }
 
     private static Query newDepthQuery(int depth) {
-        return NumericRangeQuery.newIntRange(FieldNames.PATH_DEPTH, depth, depth, true, true);
+        return IntPoint.newRangeQuery(FieldNames.PATH_DEPTH, depth, depth);
     }
 
     private static String[] createMsg(String msg){

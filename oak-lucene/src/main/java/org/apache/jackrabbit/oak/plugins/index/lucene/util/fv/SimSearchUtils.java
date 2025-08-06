@@ -30,6 +30,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -140,14 +141,14 @@ public class SimSearchUtils {
 
             if (text != null && !sp.isEmpty()) {
                 log.debug("generating similarity query for {}", text);
-                BooleanQuery booleanQuery = new BooleanQuery(true);
+                BooleanQuery.Builder booleanQueryBuilder = new BooleanQuery.Builder();
                 LSHAnalyzer analyzer = new LSHAnalyzer();
                 IndexSearcher searcher = new IndexSearcher(reader);
                 TermQuery q = new TermQuery(new Term(FieldNames.PATH, text));
                 TopDocs top = searcher.search(q, 1);
-                if (top.totalHits > 0) {
+                if (top.totalHits.value() > 0) {
                     ScoreDoc d = top.scoreDocs[0];
-                    Document doc = reader.document(d.doc);
+                    Document doc = reader.storedFields().document(d.doc);
                     for (PropertyDefinition pd : sp) {
                         log.debug("adding similarity clause for property {}", pd.name);
                         String similarityFieldName = FieldNames.createSimilarityFieldName(pd.name);
@@ -155,15 +156,16 @@ public class SimSearchUtils {
                         if (fvString != null && fvString.trim().length() > 0) {
                             log.trace("generating sim query on field {} and text {}", similarityFieldName, fvString);
                             Query simQuery = SimSearchUtils.getSimQuery(analyzer, similarityFieldName, fvString);
-                            booleanQuery.add(new BooleanClause(simQuery, SHOULD));
+                            booleanQueryBuilder.add(new BooleanClause(simQuery, SHOULD));
                             String[] binaryTags = doc.getValues(FieldNames.SIMILARITY_TAGS);
                             if (binaryTags != null && binaryTags.length > 0) {
-                                BooleanQuery tagQuery = new BooleanQuery();
+                                BooleanQuery.Builder tagQueryBuilder = new BooleanQuery.Builder();
                                 for (String brt : binaryTags) {
-                                    tagQuery.add(new BooleanClause(new TermQuery(new Term(FieldNames.SIMILARITY_TAGS, brt)), SHOULD));
+                                    tagQueryBuilder.add(new BooleanClause(new TermQuery(new Term(FieldNames.SIMILARITY_TAGS, brt)), SHOULD));
                                 }
-                                tagQuery.setBoost(0.5f);
-                                booleanQuery.add(tagQuery, SHOULD);
+                                BooleanQuery tagQuery = tagQueryBuilder.build();
+                                Query boostedTagQuery = new BoostQuery(tagQuery, 0.5f);
+                                booleanQueryBuilder.add(boostedTagQuery, SHOULD);
                             }
                             log.trace("similarity query generated for {}", pd.name);
                         } else {
@@ -171,6 +173,7 @@ public class SimSearchUtils {
                         }
                     }
                 }
+                BooleanQuery booleanQuery = booleanQueryBuilder.build();
                 if (booleanQuery.clauses().size() > 0) {
                     similarityQuery = booleanQuery;
                     log.trace("final similarity query is {}", similarityQuery);
