@@ -20,6 +20,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -135,13 +136,17 @@ public final class BufferedOakDirectory extends Directory {
         return all.toArray(new String[all.size()]);
     }
 
-    @Override
     public boolean fileExists(String name) throws IOException {
         LOG.debug("[{}]fileExists({})", definition.getIndexPath(), name);
         if (bufferedForDelete.contains(name)) {
             return false;
         }
         return buffered.fileExists(name) || base.fileExists(name);
+    }
+
+    @Override
+    public Set<String> getPendingDeletions() throws IOException {
+        return Collections.unmodifiableSet(bufferedForDelete);
     }
 
     @Override
@@ -203,13 +208,43 @@ public final class BufferedOakDirectory extends Directory {
     }
 
     @Override
-    public Lock makeLock(String name) {
-        return base.makeLock(name);
+    public Lock obtainLock(String name) throws IOException {
+        return base.obtainLock(name);
     }
 
     @Override
-    public void clearLock(String name) throws IOException {
-        base.clearLock(name);
+    public void rename(String source, String dest) throws IOException {
+        LOG.debug("[{}]rename({}, {})", definition.getIndexPath(), source, dest);
+        // Check if file exists in buffered or base
+        if (buffered.fileExists(source)) {
+            // File is in buffered directory
+            try (IndexInput input = buffered.openInput(source, IOContext.DEFAULT);
+                 IndexOutput output = buffered.createOutput(dest, IOContext.DEFAULT)) {
+                output.copyBytes(input, input.length());
+            }
+            buffered.deleteFile(source);
+        } else if (base.fileExists(source) && !bufferedForDelete.contains(source)) {
+            // File is in base directory, copy to buffered with new name
+            try (IndexInput input = base.openInput(source, IOContext.DEFAULT);
+                 IndexOutput output = buffered.createOutput(dest, IOContext.DEFAULT)) {
+                output.copyBytes(input, input.length());
+            }
+            bufferedForDelete.add(source);
+        } else {
+            throw new FileNotFoundException("Source file not found: " + source);
+        }
+    }
+
+    @Override
+    public void syncMetaData() throws IOException {
+        // Delegate to base directory
+        base.syncMetaData();
+    }
+
+    @Override
+    public IndexOutput createTempOutput(String prefix, String suffix, IOContext context) throws IOException {
+        String tempName = prefix + "_" + System.nanoTime() + "_" + suffix;
+        return createOutput(tempName, context);
     }
 
     @Override
@@ -218,7 +253,11 @@ public final class BufferedOakDirectory extends Directory {
         buffered.close();
         // copy buffered files to base
         for (String name : buffered.listAll()) {
-            buffered.copy(base, name);
+            // Directory.copy() removed in Lucene 10.x - implement manual copy
+            try (IndexInput input = buffered.openInput(name, IOContext.DEFAULT);
+                 IndexOutput output = base.createOutput(name, IOContext.DEFAULT)) {
+                output.copyBytes(input, input.length());
+            }
         }
         // remove files marked as deleted
         for (String name : bufferedForDelete) {
@@ -227,12 +266,10 @@ public final class BufferedOakDirectory extends Directory {
         base.close();
     }
 
-    @Override
     public void setLockFactory(LockFactory lockFactory) throws IOException {
         base.setLockFactory(lockFactory);
     }
 
-    @Override
     public LockFactory getLockFactory() {
         return base.getLockFactory();
     }

@@ -18,6 +18,7 @@ package org.apache.jackrabbit.oak.plugins.index.lucene.directory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
@@ -143,7 +144,6 @@ public class OakDirectory extends Directory {
         return fileNames.toArray(new String[fileNames.size()]);
     }
 
-    @Override
     public boolean fileExists(String name) throws IOException {
         return fileNames.contains(name);
     }
@@ -242,18 +242,52 @@ public class OakDirectory extends Directory {
     }
 
     @Override
-    public Lock makeLock(String name) {
-        return lockFactory.makeLock(name);
+    public Lock obtainLock(String name) throws IOException {
+        return lockFactory.obtainLock(this, name);
     }
 
     @Override
-    public void clearLock(String name) throws IOException {
-        lockFactory.clearLock(name);
+    public void rename(String source, String dest) throws IOException {
+        checkArgument(!readOnly, "Read only directory");
+        if (!fileNames.contains(source)) {
+            throw new FileNotFoundException("Source file not found: " + source);
+        }
+        if (fileNames.contains(dest)) {
+            throw new FileAlreadyExistsException("Destination file already exists: " + dest);
+        }
+        
+        // Copy the node and its properties
+        NodeBuilder sourceNode = directoryBuilder.getChildNode(source);
+        NodeBuilder destNode = directoryBuilder.setChildNode(dest);
+        
+        // Copy all properties
+        for (PropertyState prop : sourceNode.getProperties()) {
+            destNode.setProperty(prop);
+        }
+        
+        // Update file names
+        fileNames.remove(source);
+        fileNames.add(dest);
+        
+        // Remove source node
+        sourceNode.remove();
     }
 
     @Override
     public void sync(Collection<String> names) throws IOException {
-        // ?
+        // Oak handles persistence automatically
+    }
+
+    @Override
+    public void syncMetaData() throws IOException {
+        // Oak handles metadata persistence automatically
+    }
+
+    @Override
+    public IndexOutput createTempOutput(String prefix, String suffix, IOContext context) throws IOException {
+        checkArgument(!readOnly, "Read only directory");
+        String tempName = prefix + "_" + System.nanoTime() + "_" + suffix;
+        return createOutput(tempName, context);
     }
 
     @Override
@@ -275,12 +309,10 @@ public class OakDirectory extends Directory {
         }
     }
 
-    @Override
     public void setLockFactory(LockFactory lockFactory) throws IOException {
         this.lockFactory = lockFactory;
     }
 
-    @Override
     public LockFactory getLockFactory() {
         return lockFactory;
     }

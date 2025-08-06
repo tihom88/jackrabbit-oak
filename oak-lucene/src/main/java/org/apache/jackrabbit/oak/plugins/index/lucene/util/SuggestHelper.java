@@ -51,8 +51,8 @@ public class SuggestHelper {
 
     private static final Analyzer analyzer = new Analyzer() {
         @Override
-        protected TokenStreamComponents createComponents(String fieldName, Reader reader) {
-            return new TokenStreamComponents(new CRTokenizer(Version.LUCENE_47, reader));
+        protected TokenStreamComponents createComponents(String fieldName) {
+            return new TokenStreamComponents(new CRTokenizer());
         }
     };
 
@@ -134,13 +134,12 @@ public class SuggestHelper {
     }
     public static AnalyzingInfixSuggester getLookup(final Directory suggestDirectory, Analyzer analyzer,
                                                     final File tempDir) throws IOException {
-        return new AnalyzingInfixSuggester(Version.LUCENE_47, tempDir, analyzer, analyzer, 3) {
-            @Override
+        return new AnalyzingInfixSuggester(FSDirectory.open(tempDir.toPath()), analyzer) {
             protected Directory getDirectory(File path) throws IOException {
                 if (tempDir == null || tempDir.getAbsolutePath().equals(path.getAbsolutePath())) {
                     return suggestDirectory; // use oak directory for writing suggest index
                 } else {
-                    return FSDirectory.open(path); // use FS for temp index used at build time
+                    return FSDirectory.open(path.toPath()); // use FS for temp index used at build time
                 }
             }
         };

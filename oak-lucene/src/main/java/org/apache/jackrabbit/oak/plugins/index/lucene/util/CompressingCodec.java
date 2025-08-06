@@ -22,6 +22,7 @@ import org.apache.lucene.codecs.*;
 
 /**
  * Lucene Codec aimed to reduce index size as much as possible by enabling highest possible compression on term vectors and stored fields.
+ * In Lucene 10.x, we extend from the default codec to get proper implementations.
  */
 public class CompressingCodec extends Codec {
 
@@ -31,41 +32,56 @@ public class CompressingCodec extends Codec {
 
     @Override
     public PostingsFormat postingsFormat() {
-        return PostingsFormat.forName("Lucene99");
+        return Codec.getDefault().postingsFormat();
     }
 
     @Override
     public DocValuesFormat docValuesFormat() {
-        return DocValuesFormat.forName("Lucene99");
+        return Codec.getDefault().docValuesFormat();
     }
 
     @Override
     public StoredFieldsFormat storedFieldsFormat() {
-        return StoredFieldsFormat.forName("Lucene99");
+        return Codec.getDefault().storedFieldsFormat();
     }
 
     @Override
     public TermVectorsFormat termVectorsFormat() {
-        return TermVectorsFormat.forName("Lucene99");
+        return Codec.getDefault().termVectorsFormat();
     }
 
     @Override
     public FieldInfosFormat fieldInfosFormat() {
-        return FieldInfosFormat.forName("Lucene99");
+        return Codec.getDefault().fieldInfosFormat();
     }
 
     @Override
     public SegmentInfoFormat segmentInfoFormat() {
-        return SegmentInfoFormat.forName("Lucene99");
+        return Codec.getDefault().segmentInfoFormat();
     }
 
     @Override
     public NormsFormat normsFormat() {
-        return NormsFormat.forName("Lucene99");
+        return Codec.getDefault().normsFormat();
     }
 
     @Override
     public LiveDocsFormat liveDocsFormat() {
-        return LiveDocsFormat.forName("Lucene99");
+        return Codec.getDefault().liveDocsFormat();
+    }
+
+    @Override
+    public KnnVectorsFormat knnVectorsFormat() {
+        return Codec.getDefault().knnVectorsFormat();
+    }
+
+    @Override
+    public PointsFormat pointsFormat() {
+        return Codec.getDefault().pointsFormat();
+    }
+
+    @Override
+    public CompoundFormat compoundFormat() {
+        return Codec.getDefault().compoundFormat();
     }
 }

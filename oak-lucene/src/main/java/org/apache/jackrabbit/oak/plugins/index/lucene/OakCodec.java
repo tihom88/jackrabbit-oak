@@ -19,10 +19,13 @@
 package org.apache.jackrabbit.oak.plugins.index.lucene;
 
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FieldInfosFormat;
+import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
+import org.apache.lucene.codecs.PointsFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.SegmentInfoFormat;
 import org.apache.lucene.codecs.StoredFieldsFormat;
@@ -42,41 +45,56 @@ public class OakCodec extends Codec {
 
     @Override
     public PostingsFormat postingsFormat() {
-        return PostingsFormat.forName("Lucene99");
+        return Codec.getDefault().postingsFormat();
     }
 
     @Override
     public DocValuesFormat docValuesFormat() {
-        return DocValuesFormat.forName("Lucene99");
+        return Codec.getDefault().docValuesFormat();
     }
 
     @Override
     public StoredFieldsFormat storedFieldsFormat() {
-        return StoredFieldsFormat.forName("Lucene99");
+        return Codec.getDefault().storedFieldsFormat();
     }
 
     @Override
     public TermVectorsFormat termVectorsFormat() {
-        return TermVectorsFormat.forName("Lucene99");
+        return Codec.getDefault().termVectorsFormat();
     }
 
     @Override
     public FieldInfosFormat fieldInfosFormat() {
-        return FieldInfosFormat.forName("Lucene99");
+        return Codec.getDefault().fieldInfosFormat();
     }
 
     @Override
     public SegmentInfoFormat segmentInfoFormat() {
-        return SegmentInfoFormat.forName("Lucene99");
+        return Codec.getDefault().segmentInfoFormat();
     }
 
     @Override
     public NormsFormat normsFormat() {
-        return NormsFormat.forName("Lucene99");
+        return Codec.getDefault().normsFormat();
     }
 
     @Override
     public LiveDocsFormat liveDocsFormat() {
-        return LiveDocsFormat.forName("Lucene99");
+        return Codec.getDefault().liveDocsFormat();
+    }
+
+    @Override
+    public KnnVectorsFormat knnVectorsFormat() {
+        return Codec.getDefault().knnVectorsFormat();
+    }
+
+    @Override
+    public PointsFormat pointsFormat() {
+        return Codec.getDefault().pointsFormat();
+    }
+
+    @Override
+    public CompoundFormat compoundFormat() {
+        return Codec.getDefault().compoundFormat();
     }
 }
