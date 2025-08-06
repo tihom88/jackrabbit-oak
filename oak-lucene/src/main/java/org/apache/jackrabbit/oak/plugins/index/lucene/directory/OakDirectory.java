@@ -124,7 +124,7 @@ public class OakDirectory extends Directory {
                         @NotNull ActiveDeletedBlobCollectorFactory.BlobDeletionCallback blobDeletionCallback,
                         boolean streamingWriteEnabled) {
 
-        this.lockFactory = NoLockFactory.getNoLockFactory();
+        this.lockFactory = NoLockFactory.INSTANCE;
         this.builder = builder;
         this.dataNodeName = dataNodeName;
         this.directoryBuilder = readOnly ? builder.getChildNode(dataNodeName) : builder.child(dataNodeName);

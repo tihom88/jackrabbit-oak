@@ -16,58 +16,56 @@
  */
 package org.apache.jackrabbit.oak.plugins.index.lucene;
 
-import java.io.Reader;
-
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.core.LowerCaseFilter;
-import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter;
+import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.miscellaneous.WordDelimiterGraphFilter;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
-import org.apache.lucene.util.Version;
 
 /**
  * The default Lucene Analyzer used in Oak.
+ * Updated for Lucene 10.x APIs.
  */
 public class OakAnalyzer extends Analyzer {
 
-    private final Version matchVersion;
-
-    private final int preserveOriginal;
+    private final boolean preserveOriginal;
 
     /**
      * Creates a new {@link OakAnalyzer}
-     *
-     * @param matchVersion
-     *            Lucene version to match See
-     *            {@link #matchVersion above}
      */
-    public OakAnalyzer(Version matchVersion) {
-        this(matchVersion, false);
+    public OakAnalyzer() {
+        this(false);
     }
 
     /**
      * Create a new {@link OakAnalyzer} with configurable flag to preserve
      * original term being analyzed too.
-     * @param matchVersion Lucene version to match See {@link #matchVersion above}
      * @param indexOriginalTerm flag to setup analyzer such that
-     *                              {@link WordDelimiterFilter#PRESERVE_ORIGINAL}
-     *                              is set to configure word delimiter
+     *                          {@link WordDelimiterGraphFilter#PRESERVE_ORIGINAL}
+     *                          is set to configure word delimiter
      */
-    public OakAnalyzer(Version matchVersion, boolean indexOriginalTerm) {
-        this.matchVersion = matchVersion;
-        preserveOriginal = indexOriginalTerm ? WordDelimiterFilter.PRESERVE_ORIGINAL : 0;
+    public OakAnalyzer(boolean indexOriginalTerm) {
+        this.preserveOriginal = indexOriginalTerm;
     }
 
     @Override
-    protected TokenStreamComponents createComponents(final String fieldName,
-            final Reader reader) {
-        StandardTokenizer src = new StandardTokenizer(matchVersion, reader);
-        TokenStream tok = new LowerCaseFilter(matchVersion, src);
-        tok = new WordDelimiterFilter(tok,
-                WordDelimiterFilter.GENERATE_WORD_PARTS
-                        | WordDelimiterFilter.STEM_ENGLISH_POSSESSIVE
-                        | preserveOriginal
-                        | WordDelimiterFilter.GENERATE_NUMBER_PARTS, null);
+    protected TokenStreamComponents createComponents(final String fieldName) {
+        // In Lucene 10.x, createComponents no longer takes a Reader parameter
+        Tokenizer src = new StandardTokenizer();
+        TokenStream tok = new LowerCaseFilter(src);
+        
+        // Configure WordDelimiterGraphFilter flags
+        int flags = WordDelimiterGraphFilter.GENERATE_WORD_PARTS
+                | WordDelimiterGraphFilter.GENERATE_NUMBER_PARTS
+                | WordDelimiterGraphFilter.STEM_ENGLISH_POSSESSIVE;
+        
+        if (preserveOriginal) {
+            flags |= WordDelimiterGraphFilter.PRESERVE_ORIGINAL;
+        }
+        
+        tok = new WordDelimiterGraphFilter(tok, flags, null);
+        
         return new TokenStreamComponents(src, tok);
     }
 }

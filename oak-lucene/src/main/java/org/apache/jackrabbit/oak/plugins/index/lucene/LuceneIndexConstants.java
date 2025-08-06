@@ -19,8 +19,6 @@ package org.apache.jackrabbit.oak.plugins.index.lucene;
 import org.apache.jackrabbit.oak.plugins.index.search.FieldNames;
 import org.apache.jackrabbit.oak.plugins.index.search.FulltextIndexConstants;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.util.AbstractAnalysisFactory;
-import org.apache.lucene.util.Version;
 
 /**
  * Constants used internally in Lucene indexes.
@@ -33,9 +31,13 @@ public interface LuceneIndexConstants extends FulltextIndexConstants {
 
     String TRASH_CHILD_NAME = ":trash";
 
-    Version VERSION = Version.LUCENE_47;
+    /**
+     * Lucene version identifier for Lucene 10.x
+     * Note: Lucene 10.x no longer uses Version enum for most components
+     */
+    String LUCENE_VERSION = "10.2.2";
 
-    Analyzer ANALYZER = new OakAnalyzer(VERSION);
+    Analyzer ANALYZER = new OakAnalyzer();
 
     /**
      * Name of the codec to be used for indexing
@@ -53,7 +55,7 @@ public interface LuceneIndexConstants extends FulltextIndexConstants {
      */
     String TEST_MODE = "testMode";
 
-    String ANL_LUCENE_MATCH_VERSION = AbstractAnalysisFactory.LUCENE_MATCH_VERSION_PARAM;
+    String ANL_LUCENE_MATCH_VERSION = "luceneMatchVersion";
 
     /**
      * Config node which include Tika related configuration

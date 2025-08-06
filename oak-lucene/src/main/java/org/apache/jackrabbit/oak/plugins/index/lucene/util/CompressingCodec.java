@@ -19,75 +19,53 @@
 package org.apache.jackrabbit.oak.plugins.index.lucene.util;
 
 import org.apache.lucene.codecs.*;
-import org.apache.lucene.codecs.compressing.CompressingStoredFieldsFormat;
-import org.apache.lucene.codecs.compressing.CompressingTermVectorsFormat;
-import org.apache.lucene.codecs.compressing.CompressionMode;
-import org.apache.lucene.codecs.lucene40.Lucene40LiveDocsFormat;
-import org.apache.lucene.codecs.lucene42.Lucene42NormsFormat;
-import org.apache.lucene.codecs.lucene46.Lucene46Codec;
-import org.apache.lucene.codecs.lucene46.Lucene46FieldInfosFormat;
-import org.apache.lucene.codecs.lucene46.Lucene46SegmentInfoFormat;
 
 /**
  * Lucene Codec aimed to reduce index size as much as possible by enabling highest possible compression on term vectors and stored fields.
  */
-public class CompressingCodec extends FilterCodec {
-
-    private static final int CHUNK_SIZE = 1024;
-    private static final String SEGMENT_SUFFIX = "ctv";
-
-    private final TermVectorsFormat vectorsFormat = new CompressingTermVectorsFormat("Lucene41",
-            SEGMENT_SUFFIX, CompressionMode.HIGH_COMPRESSION, CHUNK_SIZE);
-    private final FieldInfosFormat fieldInfosFormat = new Lucene46FieldInfosFormat();
-    private final SegmentInfoFormat segmentInfosFormat = new Lucene46SegmentInfoFormat();
-    private final LiveDocsFormat liveDocsFormat = new Lucene40LiveDocsFormat();
-    private final PostingsFormat defaultFormat = PostingsFormat.forName("Lucene41");
-    private final DocValuesFormat defaultDVFormat = DocValuesFormat.forName("Lucene45");
-    private final NormsFormat normsFormat = new Lucene42NormsFormat();
-    private final StoredFieldsFormat fieldsFormat = new CompressingStoredFieldsFormat("Lucene41",
-            CompressionMode.HIGH_COMPRESSION, CHUNK_SIZE);
+public class CompressingCodec extends Codec {
 
     public CompressingCodec() {
-        super("compressingCodec", new Lucene46Codec());
+        super("compressingCodec");
     }
 
     @Override
     public PostingsFormat postingsFormat() {
-        return defaultFormat;
+        return PostingsFormat.forName("Lucene99");
     }
 
     @Override
     public DocValuesFormat docValuesFormat() {
-        return defaultDVFormat;
+        return DocValuesFormat.forName("Lucene99");
     }
 
     @Override
     public StoredFieldsFormat storedFieldsFormat() {
-        return fieldsFormat;
+        return StoredFieldsFormat.forName("Lucene99");
     }
 
     @Override
     public TermVectorsFormat termVectorsFormat() {
-        return vectorsFormat;
+        return TermVectorsFormat.forName("Lucene99");
     }
 
     @Override
     public FieldInfosFormat fieldInfosFormat() {
-        return fieldInfosFormat;
+        return FieldInfosFormat.forName("Lucene99");
     }
 
     @Override
     public SegmentInfoFormat segmentInfoFormat() {
-        return segmentInfosFormat;
+        return SegmentInfoFormat.forName("Lucene99");
     }
 
     @Override
     public NormsFormat normsFormat() {
-        return normsFormat;
+        return NormsFormat.forName("Lucene99");
     }
 
     @Override
     public LiveDocsFormat liveDocsFormat() {
-        return liveDocsFormat;
+        return LiveDocsFormat.forName("Lucene99");
     }
 }

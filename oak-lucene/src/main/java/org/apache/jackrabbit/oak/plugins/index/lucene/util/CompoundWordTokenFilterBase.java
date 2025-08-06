@@ -24,19 +24,15 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
-import org.apache.lucene.analysis.util.CharArraySet;
-import org.apache.lucene.util.Version;
+import org.apache.lucene.analysis.CharArraySet;
+
 
 /**
  * Base class for decomposition token filters.
- * <p id="version">
- * You must specify the required {@link Version} compatibility when creating
- * CompoundWordTokenFilterBase:
- * <ul>
- * <li>As of 3.1, CompoundWordTokenFilterBase correctly handles Unicode 4.0
+ * <p>
+ * CompoundWordTokenFilterBase correctly handles Unicode 4.0
  * supplementary characters in strings and char arrays provided as compound word
  * dictionaries.
- * </ul>
  */
 public abstract class CompoundWordTokenFilterBase extends TokenFilter {
   /**
@@ -67,15 +63,15 @@ public abstract class CompoundWordTokenFilterBase extends TokenFilter {
   
   private State current;
 
-  protected CompoundWordTokenFilterBase(Version matchVersion, TokenStream input, CharArraySet dictionary, boolean onlyLongestMatch) {
-    this(matchVersion, input,dictionary,DEFAULT_MIN_WORD_SIZE,DEFAULT_MIN_SUBWORD_SIZE,DEFAULT_MAX_SUBWORD_SIZE, onlyLongestMatch);
+  protected CompoundWordTokenFilterBase(TokenStream input, CharArraySet dictionary, boolean onlyLongestMatch) {
+    this(input,dictionary,DEFAULT_MIN_WORD_SIZE,DEFAULT_MIN_SUBWORD_SIZE,DEFAULT_MAX_SUBWORD_SIZE, onlyLongestMatch);
   }
 
-  protected CompoundWordTokenFilterBase(Version matchVersion, TokenStream input, CharArraySet dictionary) {
-    this(matchVersion, input,dictionary,DEFAULT_MIN_WORD_SIZE,DEFAULT_MIN_SUBWORD_SIZE,DEFAULT_MAX_SUBWORD_SIZE, false);
+  protected CompoundWordTokenFilterBase(TokenStream input, CharArraySet dictionary) {
+    this(input,dictionary,DEFAULT_MIN_WORD_SIZE,DEFAULT_MIN_SUBWORD_SIZE,DEFAULT_MAX_SUBWORD_SIZE, false);
   }
 
-  protected CompoundWordTokenFilterBase(Version matchVersion, TokenStream input, CharArraySet dictionary, int minWordSize, int minSubwordSize, int maxSubwordSize, boolean onlyLongestMatch) {
+  protected CompoundWordTokenFilterBase(TokenStream input, CharArraySet dictionary, int minWordSize, int minSubwordSize, int maxSubwordSize, boolean onlyLongestMatch) {
     super(input);
     
     this.tokens=new LinkedList<CompoundToken>();

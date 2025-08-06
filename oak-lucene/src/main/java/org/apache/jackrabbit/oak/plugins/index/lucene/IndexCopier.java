@@ -166,7 +166,7 @@ public class IndexCopier implements CopyOnReadStatsMBean, Closeable {
 
         //By design indexing in Oak is single threaded so Lucene locking
         //can be disabled
-        Directory dir = FSDirectory.open(indexWriterDir, NoLockFactory.getNoLockFactory());
+        Directory dir = FSDirectory.open(indexWriterDir.toPath(), NoLockFactory.INSTANCE);
 
         log.debug("IndexWriter would use {}", indexWriterDir);
         return dir;
@@ -174,7 +174,7 @@ public class IndexCopier implements CopyOnReadStatsMBean, Closeable {
 
     protected Directory createLocalDirForIndexReader(String indexPath, LuceneIndexDefinition definition, String dirName) throws IOException {
         File indexDir = getIndexDir(definition, indexPath, dirName);
-        Directory result = FSDirectory.open(indexDir);
+        Directory result = FSDirectory.open(indexDir.toPath());
 
         String newPath = indexDir.getAbsolutePath();
         String oldPath = indexPathVersionMapping.put(createIndexPathKey(indexPath, dirName), newPath);
@@ -259,7 +259,8 @@ public class IndexCopier implements CopyOnReadStatsMBean, Closeable {
         boolean successFullyDeleted = false;
         try {
             boolean fileExisted = false;
-            if (dir.fileExists(fileName)) {
+            Set<String> existingFiles = Set.of(dir.listAll());
+            if (existingFiles.contains(fileName)) {
                 fileExisted = true;
                 dir.deleteFile(fileName);
             }

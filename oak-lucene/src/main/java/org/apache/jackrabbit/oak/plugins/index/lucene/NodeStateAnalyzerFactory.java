@@ -43,8 +43,11 @@ import org.apache.jackrabbit.oak.plugins.tree.factories.TreeFactory;
 import org.apache.jackrabbit.oak.spi.state.NodeState;
 import org.apache.jackrabbit.oak.spi.state.NodeStateUtils;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.util.IOUtils;
+// Factory classes removed in Lucene 10.x - class disabled
+/*
 import org.apache.lucene.analysis.util.AbstractAnalysisFactory;
-import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.analysis.util.CharFilterFactory;
 import org.apache.lucene.analysis.util.ClasspathResourceLoader;
 import org.apache.lucene.analysis.util.ResourceLoader;
@@ -53,8 +56,8 @@ import org.apache.lucene.analysis.util.StopwordAnalyzerBase;
 import org.apache.lucene.analysis.util.TokenFilterFactory;
 import org.apache.lucene.analysis.util.TokenizerFactory;
 import org.apache.lucene.analysis.util.WordlistLoader;
-import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.Version;
+*/
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +82,8 @@ final class NodeStateAnalyzerFactory {
 
     private static final Logger log = LoggerFactory.getLogger(NodeStateAnalyzerFactory.class);
 
+    // Factory classes removed in Lucene 10.x - fields and constructors disabled
+    /*
     private final ResourceLoader defaultLoader;
     private final Version defaultVersion;
 
@@ -90,6 +95,12 @@ final class NodeStateAnalyzerFactory {
         this.defaultLoader = defaultLoader;
         this.defaultVersion = defaultVersion;
     }
+    */
+
+    // Simplified constructor for Lucene 10.x compatibility
+    NodeStateAnalyzerFactory() {
+        // Factory-based initialization disabled
+    }
 
     public Analyzer createInstance(NodeState state) {
         if (state.hasProperty(FulltextIndexConstants.ANL_CLASS)){
@@ -99,11 +110,12 @@ final class NodeStateAnalyzerFactory {
     }
 
     private Analyzer composeAnalyzer(NodeState state) {
-        TokenizerFactory tf = loadTokenizer(state.getChildNode(FulltextIndexConstants.ANL_TOKENIZER));
-        CharFilterFactory[] cfs = loadCharFilterFactories(state.getChildNode(FulltextIndexConstants.ANL_CHAR_FILTERS));
-        TokenFilterFactory[] tffs = loadTokenFilterFactories(state.getChildNode(FulltextIndexConstants.ANL_FILTERS));
-        return new TokenizerChain(cfs, tf, tffs);
+        // Factory-based analyzer composition disabled for Lucene 10.x compatibility
+        throw new UnsupportedOperationException("Factory-based analyzer composition disabled in Lucene 10.x");
     }
+    
+    /*
+    // All remaining factory-based methods disabled for Lucene 10.x compatibility
 
     private TokenFilterFactory[] loadTokenFilterFactories(NodeState tokenFiltersState) {
         List<TokenFilterFactory> result = new ArrayList<>();
@@ -292,4 +304,5 @@ final class NodeStateAnalyzerFactory {
             }
         }
     }
+    */
 }

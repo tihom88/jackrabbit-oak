@@ -28,6 +28,8 @@ import java.util.Map;
 
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.MergeTrigger;
+import org.apache.lucene.index.MergePolicy.MergeContext;
 import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.index.SegmentInfos;
 import org.slf4j.Logger;
@@ -362,7 +364,7 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
     }
 
     @Override
-    public MergeSpecification findMerges(MergeTrigger mergeTrigger, SegmentInfos infos) throws IOException {
+    public MergeSpecification findMerges(MergeTrigger mergeTrigger, SegmentInfos infos, MergeContext mergeContext) throws IOException {
         int segmentSize = infos.size();
         timeSeriesCount++;
 

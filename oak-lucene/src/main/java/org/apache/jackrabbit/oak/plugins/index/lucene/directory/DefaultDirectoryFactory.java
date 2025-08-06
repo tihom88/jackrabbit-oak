@@ -35,7 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.SUGGEST_DATA_CHILD_NAME;
-import static org.apache.lucene.store.NoLockFactory.getNoLockFactory;
+import org.apache.lucene.store.NoLockFactory;
 
 public class DefaultDirectoryFactory implements DirectoryFactory {
     private static final boolean READ_BEFORE_WRITE = !Boolean.getBoolean("oak.lucene.readBeforeWriteDisabled");
@@ -115,7 +115,7 @@ public class DefaultDirectoryFactory implements DirectoryFactory {
             // etc. so instead of fixing these issues we'd better
             // work on making the in-content index work without
             // problems (or look at the Solr indexer as alternative)
-            return FSDirectory.open(file, getNoLockFactory());
+            return FSDirectory.open(file, NoLockFactory.INSTANCE);
         }
     }
 }

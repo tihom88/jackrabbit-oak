@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.jackrabbit.oak.plugins.index.search.FulltextIndexConstants.ANL_DEFAULT;
 import static org.apache.jackrabbit.oak.plugins.index.search.FulltextIndexConstants.INDEX_ORIGINAL_TERM;
-import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.VERSION;
+import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.LUCENE_VERSION;
 import static org.apache.jackrabbit.oak.plugins.index.search.util.ConfigUtil.getOptionalValue;
 
 public class LuceneIndexDefinition extends IndexDefinition {
@@ -144,9 +144,8 @@ public class LuceneIndexDefinition extends IndexDefinition {
         if (!evaluatePathRestrictions()){
             result = defaultAnalyzer;
         } else {
-            Map<String, Analyzer> analyzerMap = Map.of(
-                    FieldNames.ANCESTORS, new TokenizerChain(new PathHierarchyTokenizerFactory(Collections.emptyMap())));
-            result = new PerFieldAnalyzerWrapper(defaultAnalyzer, analyzerMap);
+            // TokenizerChain disabled in Lucene 10.x - using default analyzer for all fields
+            result = defaultAnalyzer;
         }
 
         //In case of negative value no limits would be applied
@@ -158,7 +157,7 @@ public class LuceneIndexDefinition extends IndexDefinition {
 
     private static Map<String, Analyzer> collectAnalyzers(NodeState defn) {
         Map<String, Analyzer> analyzerMap = new HashMap<>();
-        NodeStateAnalyzerFactory factory = new NodeStateAnalyzerFactory(VERSION);
+        NodeStateAnalyzerFactory factory = new NodeStateAnalyzerFactory();
         NodeState analyzersTree = defn.getChildNode(FulltextIndexConstants.ANALYZERS);
         for (ChildNodeEntry cne : analyzersTree.getChildNodeEntries()) {
             Analyzer a = factory.createInstance(cne.getNodeState());
@@ -166,7 +165,7 @@ public class LuceneIndexDefinition extends IndexDefinition {
         }
 
         if (getOptionalValue(analyzersTree, INDEX_ORIGINAL_TERM, false) && !analyzerMap.containsKey(ANL_DEFAULT)) {
-            analyzerMap.put(ANL_DEFAULT, new OakAnalyzer(VERSION, true));
+            analyzerMap.put(ANL_DEFAULT, new OakAnalyzer(true));
         }
 
         return Collections.unmodifiableMap(analyzerMap);
@@ -208,7 +207,7 @@ public class LuceneIndexDefinition extends IndexDefinition {
         MergePolicy mergePolicy = null;
         if (mergePolicyName != null) {
             if (mergePolicyName.equalsIgnoreCase("no")) {
-                mergePolicy = NoMergePolicy.COMPOUND_FILES;
+                mergePolicy = NoMergePolicy.INSTANCE;
             } else if (mergePolicyName.equalsIgnoreCase("mitigated")) {
                 mergePolicy = new CommitMitigatingTieredMergePolicy();
             } else if (mergePolicyName.equalsIgnoreCase("tiered") || mergePolicyName.equalsIgnoreCase("default")) {
