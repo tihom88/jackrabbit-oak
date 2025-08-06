@@ -203,7 +203,7 @@ abstract public class OakDirectoryTestBase {
         o.writeBytes(data, data.length);
         o.close();
 
-        assertTrue(dir.fileExists("test"));
+        assertTrue(Arrays.asList(dir.listAll()).contains("test"));
         assertEquals(fileSize, dir.fileLength("test"));
 
         IndexInput i = dir.openInput("test", IOContext.DEFAULT);
@@ -326,18 +326,7 @@ abstract public class OakDirectoryTestBase {
         } catch (AlreadyClosedException e) {
             // expected exception
         }
-        try {
-            input.readStringSet();
-            fail("cannot use IndexInput once closed");
-        } catch (AlreadyClosedException e) {
-            // expected exception
-        }
-        try {
-            input.readStringStringMap();
-            fail("cannot use IndexInput once closed");
-        } catch (AlreadyClosedException e) {
-            // expected exception
-        }
+        // readStringSet() and readStringStringMap() methods removed in Lucene 10.x
         try {
             input.readVInt();
             fail("cannot use IndexInput once closed");
