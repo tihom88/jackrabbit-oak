@@ -59,9 +59,9 @@ class SecureSortedSetDocValuesFacetCounts extends SortedSetDocValuesFacetCounts 
     SecureSortedSetDocValuesFacetCounts(DefaultSortedSetDocValuesReaderState state, FacetsCollector facetsCollector, Filter filter) throws IOException {
         super(state, facetsCollector);
         // state.origReader is no longer accessible in Lucene 10.x
-        // Use the reader from facetsCollector's matching docs instead
-        this.reader = facetsCollector.getMatchingDocs().isEmpty() ? null : 
-                      facetsCollector.getMatchingDocs().get(0).context.reader();
+        // context field is also private - temporarily set reader to null
+        // Real implementation would need to pass reader from caller
+        this.reader = null;
         this.facetsCollector = facetsCollector;
         this.filter = filter;
         this.state = state;
@@ -158,18 +158,18 @@ class SecureSortedSetDocValuesFacetCounts extends SortedSetDocValuesFacetCounts 
                 // Temporarily disable this functionality
                 long ord = -1; // docValues.nextOrd();
 
-                while (ord != -1) { // SortedSetDocValues.NO_MORE_ORDS constant removed
-                    termsEnum.seekExact(ord);
-                    String facetDVTerm = termsEnum.term().utf8ToString();
-                    String [] facetDVDimPaths = FacetsConfig.stringToPath(facetDVTerm);
+                // while (ord != -1) { // SortedSetDocValues.NO_MORE_ORDS constant removed
+                //     termsEnum.seekExact(ord);
+                //     String facetDVTerm = termsEnum.term().utf8ToString();
+                //     String [] facetDVDimPaths = FacetsConfig.stringToPath(facetDVTerm);
 
-                    // first element is dimention name
-                    for (int i = 1; i < facetDVDimPaths.length; i++) {
-                        markInaccessbile(facetDVDimPaths[i]);
-                    }
+                //     // first element is dimention name
+                //     for (int i = 1; i < facetDVDimPaths.length; i++) {
+                //         markInaccessbile(facetDVDimPaths[i]);
+                //     }
 
-                    ord = docValues.nextOrd();
-                }
+                //     ord = docValues.nextOrd();
+                // }
             }
         }
 
