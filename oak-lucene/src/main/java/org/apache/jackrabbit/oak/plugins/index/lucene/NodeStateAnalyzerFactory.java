@@ -84,8 +84,6 @@ final class NodeStateAnalyzerFactory {
             JcrConstants.JCR_PRIMARYTYPE
     );
 
-    private static final Logger log = LoggerFactory.getLogger(NodeStateAnalyzerFactory.class);
-
     // Factory classes removed in Lucene 10.x - fields and constructors disabled
     /*
     private final ResourceLoader defaultLoader;
