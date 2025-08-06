@@ -70,7 +70,8 @@
     <groovy.version>3.0.24</groovy.version>
     <netty.version>4.1.119.Final</netty.version>
     <!-- determines the bytecode version (i.e. the minimum JRE required to run the build artifact) -->
-    <javaTargetVersion>11</javaTargetVersion>
+    <!-- Updated to Java 21 for Lucene 10.2.2 compatibility -->
+    <javaTargetVersion>21</javaTargetVersion>
     <maven.compiler.release>${javaTargetVersion}</maven.compiler.release>
     <maven.compiler.target>${javaTargetVersion}</maven.compiler.target>
     <minimalJavaBuildVersion>${javaTargetVersion}</minimalJavaBuildVersion>

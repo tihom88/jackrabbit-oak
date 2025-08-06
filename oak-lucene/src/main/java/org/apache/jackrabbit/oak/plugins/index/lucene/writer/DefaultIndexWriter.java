@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.jackrabbit.oak.api.PropertyState;
 import org.apache.jackrabbit.oak.api.Type;
@@ -192,7 +193,7 @@ class DefaultIndexWriter implements LuceneIndexWriter {
             final Closer closer = Closer.create();
 
             NodeBuilder suggesterStatus = definitionBuilder.child(suggestDirName);
-            DirectoryReader reader = closer.register(DirectoryReader.open(writer, false));
+            DirectoryReader reader = closer.register(DirectoryReader.open(writer));
             final Directory suggestDirectory = directoryFactory.newInstance(definition, definitionBuilder, suggestDirName, false);
             // updateSuggester would close the directory (directly or via lookup)
             // closer.register(suggestDirectory);
@@ -274,8 +275,8 @@ class DefaultIndexWriter implements LuceneIndexWriter {
         requireNonNull(definition);
         requireNonNull(directory);
 
-        int docs = writer.numDocs();
-        int ram = writer.numRamDocs();
+        int docs = writer.getDocStats().numDocs;
+        int ram = writer.getDocStats().numDocs; // numRamDocs not available in Lucene 10.x
 
         log.trace("Writer for directory {} - docs: {}, ramDocs: {}", definition, docs, ram);
 
@@ -284,7 +285,7 @@ class DefaultIndexWriter implements LuceneIndexWriter {
         StringBuilder sb = new StringBuilder();
         for (String f : files) {
             sb.append(f).append(":");
-            if (directory.fileExists(f)) {
+            if (Set.of(directory.listAll()).contains(f)) {
                 long size = directory.fileLength(f);
                 overallSize += size;
                 sb.append(size);

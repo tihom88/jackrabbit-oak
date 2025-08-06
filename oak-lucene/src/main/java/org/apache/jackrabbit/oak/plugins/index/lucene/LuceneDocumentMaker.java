@@ -210,9 +210,10 @@ public class LuceneDocumentMaker extends FulltextDocumentMaker<Document> {
     protected void indexAggregateValue(Document doc, Aggregate.NodeIncludeResult result, String value, PropertyDefinition pd) {
         Field field = result.isRelativeNode() ?
                 newFulltextField(result.rootIncludePath, value) : newFulltextField(value);
-        if (pd != null) {
-            field.setBoost(pd.boost);
-        }
+        // Note: Field.setBoost() removed in Lucene 10.x - boost should be applied at query time
+        // if (pd != null) {
+        //     field.setBoost(pd.boost);
+        // }
         doc.add(field);
     }
 
@@ -486,17 +487,18 @@ public class LuceneDocumentMaker extends FulltextDocumentMaker<Document> {
         private static final FieldType ft = new FieldType();
 
         static {
-            ft.setIndexed(true);
+            // ft.setIndexed(true); // Replaced by setIndexOptions in Lucene 10.x
             ft.setStored(false);
             ft.setTokenized(false);
             ft.setOmitNorms(false);
-            ft.setIndexOptions(org.apache.lucene.index.FieldInfo.IndexOptions.DOCS_ONLY);
+            ft.setIndexOptions(org.apache.lucene.index.IndexOptions.DOCS);
             ft.freeze();
         }
 
         AugmentedField(String name, double weight) {
             super(name, "1", ft);
-            setBoost((float) weight);
+            // Note: setBoost() removed in Lucene 10.x - boost should be applied at query time
+            // setBoost((float) weight);
         }
     }
 

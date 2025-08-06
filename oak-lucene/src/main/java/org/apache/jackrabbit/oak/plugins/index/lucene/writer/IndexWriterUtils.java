@@ -70,7 +70,7 @@ public class IndexWriterUtils {
                 analyzers.put(FieldNames.SUGGEST, SuggestHelper.getAnalyzer());
             }
             Analyzer analyzer = new PerFieldAnalyzerWrapper(definitionAnalyzer, analyzers);
-            IndexWriterConfig config = new IndexWriterConfig(VERSION, analyzer);
+            IndexWriterConfig config = new IndexWriterConfig(analyzer);
             if (serialScheduler) {
                 config.setMergeScheduler(new SerialMergeScheduler());
             } else {
@@ -82,7 +82,7 @@ public class IndexWriterUtils {
                 config.setCodec(definition.getCodec());
             }
             config.setRAMBufferSizeMB(writerConfig.getRamBufferSizeMB());
-            config.setMaxBufferedDeleteTerms(writerConfig.getMaxBufferedDeleteTerms());
+            // config.setMaxBufferedDeleteTerms() removed in Lucene 10.x
             config.setRAMPerThreadHardLimitMB(writerConfig.getRamPerThreadHardLimitMB());
             return config;
         } finally {

@@ -267,7 +267,12 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
             // we only restrict non-full-text conditions if there is
             // no relative property in the full-text constraint
             boolean nonFullTextConstraints = parent.isEmpty();
-            String planDesc = getLuceneRequest(filter, null, nonFullTextConstraints, index.getDefinition()) + " ft:(" + ft + ")";
+            String planDesc;
+            try {
+                planDesc = getLuceneRequest(filter, null, nonFullTextConstraints, index.getDefinition()) + " ft:(" + ft + ")";
+            } catch (IOException e) {
+                planDesc = "Error creating plan: " + e.getMessage();
+            }
             if (!parent.isEmpty()) {
                 planDesc += " parent:" + parent;
             }
@@ -622,7 +627,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
      * @return the Lucene query
      */
     private static LuceneRequestFacade getLuceneRequest(Filter filter, IndexReader reader, boolean nonFullTextConstraints,
-                                                        LuceneIndexDefinition indexDefinition) {
+                                                        LuceneIndexDefinition indexDefinition) throws IOException {
         List<Query> qs = new ArrayList<Query>();
         Analyzer analyzer = indexDefinition.getAnalyzer();
         FullTextExpression ft = filter.getFullTextConstraint();

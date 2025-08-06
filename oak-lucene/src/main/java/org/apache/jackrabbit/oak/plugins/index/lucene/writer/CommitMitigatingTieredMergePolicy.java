@@ -597,7 +597,7 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
                         totAfterMergeBytes += segBytes;
                     }
 
-                    final MergeScore score = score(candidate, hitTooLarge, mergingBytes);
+                    final MergeScore score = score(candidate, hitTooLarge, mergingBytes, mergeContext);
                     if (verbose()) {
                         message("  maybe=" + segmentListToString(candidate) + " score=" + score.getScore() + " " + score.getExplanation() + " tooLarge=" + hitTooLarge + " size=" + String.format(Locale.ROOT, "%.3f MB", totAfterMergeBytes / 1024. / 1024.));
                     }
@@ -650,7 +650,7 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
      * @param mergingBytes the bytes to merge
      * @return a merge score
      **/
-    protected MergeScore score(List<SegmentCommitInfo> candidate, boolean hitTooLarge, long mergingBytes) throws IOException {
+    protected MergeScore score(List<SegmentCommitInfo> candidate, boolean hitTooLarge, long mergingBytes, MergeContext mergeContext) throws IOException {
         long totBeforeMergeBytes = 0;
         long totAfterMergeBytes = 0;
         long totAfterMergeBytesFloored = 0;
@@ -735,7 +735,7 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
         }
 
         if ((maxSegmentCount > 1 && eligible.size() <= maxSegmentCount) ||
-                (maxSegmentCount == 1 && eligible.size() == 1 && (!segmentIsOriginal || isMerged(infos, eligible.get(0))))) {
+                (maxSegmentCount == 1 && eligible.size() == 1 && (!segmentIsOriginal || isMerged(infos, eligible.get(0), mergeContext)))) {
             if (verbose()) {
                 message("already merged");
             }
@@ -771,7 +771,7 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
             final int numToMerge = end - maxSegmentCount + 1;
             final OneMerge merge = new OneMerge(eligible.subList(end - numToMerge, end));
             if (verbose()) {
-                message("add final merge=" + merge.segString(writer.get().getDirectory()));
+                message("add final merge=" + segmentListToString(merge.segments));
             }
             spec = new MergeSpecification();
             spec.add(merge);
@@ -827,7 +827,6 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
         return spec;
     }
 
-    @Override
     public void close() {
     }
 
@@ -836,12 +835,12 @@ public class CommitMitigatingTieredMergePolicy extends MergePolicy {
     }
 
     private boolean verbose() {
-        final IndexWriter w = writer.get();
-        return w != null && w.getConfig().getInfoStream().isEnabled("TMP");
+        // Simplified for Lucene 10.x - could be made configurable
+        return log.isDebugEnabled();
     }
 
     private void message(String message) {
-        writer.get().getConfig().getInfoStream().message("TMP", message);
+        log.debug("[TMP] {}", message);
     }
 
     @Override

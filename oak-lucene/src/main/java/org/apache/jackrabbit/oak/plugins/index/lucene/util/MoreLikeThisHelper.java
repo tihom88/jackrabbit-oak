@@ -16,6 +16,7 @@
  */
 package org.apache.jackrabbit.oak.plugins.index.lucene.util;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,7 @@ import org.apache.lucene.search.TopDocs;
  */
 public class MoreLikeThisHelper {
 
-    public static Query getMoreLikeThis(IndexReader reader, Analyzer analyzer, String mltQueryString) {
+    public static Query getMoreLikeThis(IndexReader reader, Analyzer analyzer, String mltQueryString) throws IOException {
         Query moreLikeThisQuery = null;
         MoreLikeThis mlt = new MoreLikeThis(reader);
         mlt.setAnalyzer(analyzer);
@@ -82,12 +83,12 @@ public class MoreLikeThisHelper {
                     IndexSearcher searcher = new IndexSearcher(reader);
                     TermQuery q = new TermQuery(new Term(FieldNames.PATH, text));
                     TopDocs top = searcher.search(q, 1);
-                    if (top.totalHits == 0) {
+                    if (top.totalHits.value() == 0) {
                         mlt.setFieldNames(fields);
-                        moreLikeThisQuery = mlt.like(new StringReader(text), mlt.getFieldNames()[0]);
+                        moreLikeThisQuery = mlt.like(mlt.getFieldNames()[0], new StringReader(text));
                     } else{
                         ScoreDoc d = top.scoreDocs[0];
-                        Document doc = reader.document(d.doc);
+                        Document doc = reader.storedFields().document(d.doc);
                         List<String> fieldNames = new ArrayList<String>();
                         for (IndexableField f : doc.getFields()) {
                             if (!FieldNames.PATH.equals(f.name())) {
@@ -100,7 +101,7 @@ public class MoreLikeThisHelper {
                     }
                 } else {
                     mlt.setFieldNames(fields);
-                    moreLikeThisQuery = mlt.like(new StringReader(text), mlt.getFieldNames()[0]);
+                    moreLikeThisQuery = mlt.like(mlt.getFieldNames()[0], new StringReader(text));
                 }
             }
             return moreLikeThisQuery;

@@ -921,9 +921,14 @@ public class LucenePropertyIndex extends FulltextIndex {
                         sp.addAll(r.getSimilarityProperties());
                     }
                     if (sp.isEmpty()) {
-                        Query moreLikeThis = MoreLikeThisHelper.getMoreLikeThis(reader, analyzer, mltQueryString);
-                        if (moreLikeThis != null) {
-                            qs.add(moreLikeThis);
+                        try {
+                            Query moreLikeThis = MoreLikeThisHelper.getMoreLikeThis(reader, analyzer, mltQueryString);
+                            if (moreLikeThis != null) {
+                                qs.add(moreLikeThis);
+                            }
+                        } catch (IOException e) {
+                            // Log the error but continue - MoreLikeThis is not critical functionality
+                            LOG.debug("Error processing MoreLikeThis query: {}", e.getMessage());
                         }
                     } else {
                         Query similarityQuery = SimSearchUtils.getSimilarityQuery(sp, reader, mltQueryString);
