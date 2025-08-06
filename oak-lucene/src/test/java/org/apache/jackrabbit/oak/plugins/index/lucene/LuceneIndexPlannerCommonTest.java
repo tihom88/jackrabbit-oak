@@ -57,7 +57,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.VERSION;
+import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.LUCENE_VERSION;
 import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexStatistics.SYNTHETICALLY_FALLIABLE_FIELD;
 import static org.apache.jackrabbit.oak.plugins.index.lucene.TestUtil.child;
 import static org.apache.jackrabbit.oak.plugins.index.lucene.util.LuceneIndexHelper.newLuceneIndexDefinition;
@@ -669,7 +669,7 @@ public class LuceneIndexPlannerCommonTest extends IndexPlannerCommonTest {
 
     private static Directory createSampleDirectory(long numOfDocs, Iterable<Document> docs) throws IOException {
         Directory dir = new ByteBuffersDirectory();
-        IndexWriterConfig config = new IndexWriterConfig(VERSION, LuceneIndexConstants.ANALYZER);
+        IndexWriterConfig config = new IndexWriterConfig( LuceneIndexConstants.ANALYZER);
         IndexWriter writer = new  IndexWriter(dir, config);
         for (int i = 0; i < numOfDocs; i++) {
             Document doc = new Document();

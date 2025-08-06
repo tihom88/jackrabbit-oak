@@ -36,7 +36,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexStatistics.SYNTHETICALLY_FALLIABLE_FIELD;
-import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.VERSION;
+import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.LUCENE_VERSION;
 import static org.junit.Assert.assertEquals;
 
 public class IndexStatisticsTest {

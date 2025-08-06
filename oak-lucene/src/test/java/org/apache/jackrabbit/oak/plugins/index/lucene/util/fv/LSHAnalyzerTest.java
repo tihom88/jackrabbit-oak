@@ -53,7 +53,7 @@ public class LSHAnalyzerTest {
         for (String text : texts) {
             LSHAnalyzer analyzer = new LSHAnalyzer();
             Directory directory = new ByteBuffersDirectory();
-            IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(Version.LUCENE_47, analyzer));
+            IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(analyzer));
             DirectoryReader reader = null;
             try {
                 Document document = new Document();
@@ -61,7 +61,7 @@ public class LSHAnalyzerTest {
                 writer.addDocument(document);
                 writer.commit();
 
-                reader = DirectoryReader.open(writer, false);
+                reader = DirectoryReader.open(writer);
                 assertSimQuery(analyzer, fieldName, text, reader);
             } finally {
                 if (reader != null) {
@@ -77,7 +77,7 @@ public class LSHAnalyzerTest {
     public void testBinaryFVIndexAndSearch() throws Exception {
       LSHAnalyzer analyzer = new LSHAnalyzer();
       Directory directory = new ByteBuffersDirectory();
-      IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(Version.LUCENE_47, analyzer));
+      IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(analyzer));
       DirectoryReader reader = null;
       try {
           List<Double> values = new LinkedList<>();
@@ -101,7 +101,7 @@ public class LSHAnalyzerTest {
           writer.addDocument(document);
           writer.commit();
 
-          reader = DirectoryReader.open(writer, false);
+          reader = DirectoryReader.open(writer);
           assertSimQuery(analyzer, fieldName, fvString, reader);
       } finally {
           if (reader != null) {
