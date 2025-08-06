@@ -110,4 +110,14 @@ class OakIndexInput extends IndexInput {
         }
     }
 
+    @Override
+    public IndexInput slice(String sliceDescription, long offset, long length) throws IOException {
+        if (offset < 0 || length < 0 || offset + length > length()) {
+            throw new IllegalArgumentException("Invalid slice parameters");
+        }
+        OakIndexInput slice = (OakIndexInput) clone();
+        slice.seek(offset);
+        return slice;
+    }
+
 }

@@ -30,6 +30,8 @@ import org.apache.jackrabbit.oak.spi.state.ReadOnlyBuilder;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
 
 import static org.apache.jackrabbit.oak.plugins.index.lucene.writer.MultiplexersLucene.isIndexDirName;
 import static org.apache.jackrabbit.oak.plugins.index.lucene.writer.MultiplexersLucene.isSuggestIndexDirName;
@@ -88,13 +90,17 @@ public class LuceneIndexDumper {
         meta.addDirectoryMapping(dirName, idxDir.getName());
 
         Directory sourceDir = new OakDirectory(new ReadOnlyBuilder(idx), dirName, defn, true);
-        Directory targetDir = FSDirectory.open(idxDir);
+        Directory targetDir = FSDirectory.open(idxDir.toPath());
 
         closer.register(sourceDir);
         closer.register(targetDir);
 
         for (String file : sourceDir.listAll()) {
-            sourceDir.copy(targetDir, file, file, IOContext.DEFAULT);
+            // Directory.copy() removed in Lucene 10.x - implement manual copy
+            try (IndexInput input = sourceDir.openInput(file, IOContext.DEFAULT);
+                 IndexOutput output = targetDir.createOutput(file, IOContext.DEFAULT)) {
+                output.copyBytes(input, input.length());
+            }
             size += sourceDir.fileLength(file);
         }
     }

@@ -33,7 +33,7 @@ public class OakWordTokenFilter extends CompoundWordTokenFilterBase {
     private final TypeAttribute typeAtt = addAttribute(TypeAttribute.class);
 
     public OakWordTokenFilter(Version version, TokenStream in, char[] separators) {
-        super(version, in, null);
+        super(in, null);
         this.separators = separators;
         Arrays.sort(this.separators);
     }

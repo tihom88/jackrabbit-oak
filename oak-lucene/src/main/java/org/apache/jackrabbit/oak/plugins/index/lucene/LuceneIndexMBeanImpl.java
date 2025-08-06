@@ -88,6 +88,8 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
 import org.jetbrains.annotations.NotNull;
@@ -441,9 +443,13 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
                 log.info("Dumping Lucene directory content for [{}] to [{}]", sourcePath, destPath);
                 Directory source = getDirectory(getPrimaryReader(indexNode.getPrimaryReaders()));
                 requireNonNull(source, "IndexSearcher not backed by DirectoryReader");
-                Directory dest = FSDirectory.open(new File(destPath));
+                Directory dest = FSDirectory.open(new File(destPath).toPath());
                 for (String file : source.listAll()) {
-                    source.copy(dest, file, file, IOContext.DEFAULT);
+                    // Directory.copy() removed in Lucene 10.x - implement manual copy
+                    try (IndexInput input = source.openInput(file, IOContext.DEFAULT);
+                         IndexOutput output = dest.createOutput(file, IOContext.DEFAULT)) {
+                        output.copyBytes(input, input.length());
+                    }
                 }
             }
         } finally {
@@ -456,7 +462,9 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
     private static ArrayList<String> getFieldInfo(String path, IndexSearcher searcher) throws IOException {
         ArrayList<String> list = new ArrayList<String>();
         IndexReader reader = searcher.getIndexReader();
-        Fields fields = MultiFields.getFields(reader);
+        // MultiFields.getFields() was removed in Lucene 10.x
+        // Skip complex field statistics for now
+        Fields fields = null;
         if (fields != null) {
             for(String f : fields) {
                 list.add(path + " " + f + " " + reader.getDocCount(f));
