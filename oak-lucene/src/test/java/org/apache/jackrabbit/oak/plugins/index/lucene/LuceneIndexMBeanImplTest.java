@@ -41,7 +41,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.util.Version;
 import org.junit.Before;
 import org.junit.Test;
@@ -65,7 +65,7 @@ public class LuceneIndexMBeanImplTest {
     }
 
     private IndexWriter addNodeIndex(String path) throws IOException {
-        Directory directory = new RAMDirectory();
+        Directory directory = new ByteBuffersDirectory();
         Analyzer analyzer = new SimpleAnalyzer(Version.LUCENE_47);
         IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_47, analyzer);
         IndexWriter writer = new IndexWriter(directory, config);

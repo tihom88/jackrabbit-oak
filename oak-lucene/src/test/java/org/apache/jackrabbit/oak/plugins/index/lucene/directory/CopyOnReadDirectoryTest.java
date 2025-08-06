@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.jackrabbit.oak.plugins.index.lucene.IndexCopier;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -42,7 +42,7 @@ public class CopyOnReadDirectoryTest {
         AtomicInteger executionCount = new AtomicInteger();
         Executor e = r -> {executionCount.incrementAndGet(); r.run();};
         IndexCopier c = new IndexCopier(newDirectExecutorService(), temporaryFolder.newFolder(), true);
-        Directory dir = new CopyOnReadDirectory(c, new RAMDirectory(), new RAMDirectory(), false, "foo", e);
+        Directory dir = new CopyOnReadDirectory(c, new ByteBuffersDirectory(), new ByteBuffersDirectory(), false, "foo", e);
 
         dir.close();
         dir.close();

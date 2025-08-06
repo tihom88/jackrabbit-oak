@@ -25,7 +25,7 @@ import java.util.Random;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexOutput;
-import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
@@ -34,8 +34,8 @@ import static org.junit.Assert.assertTrue;
 public class IndexSanityCheckerTest {
     private Random rnd = new Random();
 
-    private Directory local = new RAMDirectory();
-    private Directory remote = new RAMDirectory();
+    private Directory local = new ByteBuffersDirectory();
+    private Directory remote = new ByteBuffersDirectory();
     
     private IndexSanityChecker.IndexSanityStatistics stats = new IndexSanityChecker.IndexSanityStatistics();
 

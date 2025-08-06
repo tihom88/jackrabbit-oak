@@ -27,7 +27,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.junit.After;
 import org.junit.Test;
 
@@ -168,7 +168,7 @@ public class IndexStatisticsTest {
     }
 
     private static Directory createSampleDirectory(Iterable<Document> docs) throws IOException {
-        Directory dir = new RAMDirectory();
+        Directory dir = new ByteBuffersDirectory();
         IndexWriter writer = null;
         try {
             writer = getWriter(dir);

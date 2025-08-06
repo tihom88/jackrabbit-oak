@@ -96,7 +96,7 @@ import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Test;
@@ -1925,7 +1925,7 @@ public class IndexPlannerTest {
     }
 
     private static Directory createSampleDirectory(long numOfDocs, Iterable<Document> docs) throws IOException {
-        Directory dir = new RAMDirectory();
+        Directory dir = new ByteBuffersDirectory();
         IndexWriterConfig config = new IndexWriterConfig(VERSION, LuceneIndexConstants.ANALYZER);
         IndexWriter writer = new  IndexWriter(dir, config);
         for (int i = 0; i < numOfDocs; i++) {
