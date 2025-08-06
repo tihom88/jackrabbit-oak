@@ -95,6 +95,7 @@ import org.apache.lucene.facet.LabelAndValue;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.IndexableField;
@@ -107,6 +108,7 @@ import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
 import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler;
 import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -1478,36 +1480,36 @@ public class LucenePropertyIndex extends FulltextIndex {
 
             @Override
             public boolean visit(FullTextOr or) {
-                BooleanQuery q = new BooleanQuery();
+                BooleanQuery.Builder qBuilder = new BooleanQuery.Builder();
                 for (FullTextExpression e : or.list) {
                     Query x = getFullTextQuery(plan, e, analyzer, augmentor);
-                    q.add(x, SHOULD);
+                    qBuilder.add(x, SHOULD);
                 }
-                result.set(q);
+                result.set(qBuilder.build());
                 return true;
             }
 
             @Override
             public boolean visit(FullTextAnd and) {
-                BooleanQuery q = new BooleanQuery();
+                BooleanQuery.Builder qBuilder = new BooleanQuery.Builder();
                 for (FullTextExpression e : and.list) {
                     Query x = getFullTextQuery(plan, e, analyzer, augmentor);
                     /* Only unwrap the clause if MUST_NOT(x) */
                     boolean hasMustNot = false;
                     if (x instanceof BooleanQuery) {
                         BooleanQuery bq = (BooleanQuery) x;
-                        if ((bq.getClauses().length == 1) &&
-                                (bq.getClauses()[0].getOccur() == BooleanClause.Occur.MUST_NOT)) {
+                        if ((bq.clauses().size() == 1) &&
+                                (bq.clauses().get(0).occur() == BooleanClause.Occur.MUST_NOT)) {
                             hasMustNot = true;
-                            q.add(bq.getClauses()[0]);
+                            qBuilder.add(bq.clauses().get(0));
                         }
                     }
 
                     if (!hasMustNot) {
-                        q.add(x, MUST);
+                        qBuilder.add(x, MUST);
                     }
                 }
-                result.set(q);
+                result.set(qBuilder.build());
                 return true;
             }
 
@@ -1531,12 +1533,12 @@ public class LucenePropertyIndex extends FulltextIndex {
                     return false;
                 }
                 if (boost != null) {
-                    q.setBoost(Float.parseFloat(boost));
+                    q = new BoostQuery(q, Float.parseFloat(boost));
                 }
                 if (not) {
-                    BooleanQuery bq = new BooleanQuery();
-                    bq.add(q, MUST_NOT);
-                    result.set(bq);
+                    BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
+                    bqBuilder.add(q, MUST_NOT);
+                    result.set(bqBuilder.build());
                 } else {
                     result.set(q);
                 }
@@ -1579,39 +1581,39 @@ public class LucenePropertyIndex extends FulltextIndex {
         //Expand the query on fulltext field
         if (FieldNames.FULLTEXT.equals(fieldName) &&
                 !indexingRule.getNodeScopeAnalyzedProps().isEmpty()) {
-            BooleanQuery in = new BooleanQuery();
+            BooleanQuery.Builder inBuilder = new BooleanQuery.Builder();
             for (PropertyDefinition pd : indexingRule.getNodeScopeAnalyzedProps()) {
                 Query q = tokenToQuery(text, FieldNames.createAnalyzedFieldName(pd.name), analyzer);
-                q.setBoost(pd.boost);
-                in.add(q, BooleanClause.Occur.SHOULD);
+                q = new BoostQuery(q, pd.boost);
+                inBuilder.add(q, BooleanClause.Occur.SHOULD);
             }
 
             //Add the query for actual fulltext field also. That query would
             //not be boosted
-            in.add(tokenToQuery(text, fieldName, analyzer), BooleanClause.Occur.SHOULD);
-            ret = in;
+            inBuilder.add(tokenToQuery(text, fieldName, analyzer), BooleanClause.Occur.SHOULD);
+            ret = inBuilder.build();
         } else {
             ret = tokenToQuery(text, fieldName, analyzer);
         }
 
         //Augment query terms if available (as a 'SHOULD' clause)
         if (FieldNames.FULLTEXT.equals(fieldName)) {
-            Query subQuery = new BooleanQuery();
+            Query subQuery = null;
             if (pr.indexDefinition.isDynamicBoostLiteEnabled()) {
                 subQuery = tokenToQuery(text, FieldNames.SIMILARITY_TAGS, analyzer);
                 // De-boosting dynamic boost based query so other clauses will have more relevance
-                subQuery.setBoost(DYNAMIC_BOOST_WEIGHT);
+                subQuery = new BoostQuery(subQuery, DYNAMIC_BOOST_WEIGHT);
             } else if (augmentor != null) {
                 subQuery = augmentor.getQueryTerm(text, analyzer, pr.indexDefinition.getDefinitionNodeState());
             }
 
             if (subQuery != null) {
-                BooleanQuery query = new BooleanQuery();
+                BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
 
-                query.add(ret, BooleanClause.Occur.SHOULD);
-                query.add(subQuery, BooleanClause.Occur.SHOULD);
+                queryBuilder.add(ret, BooleanClause.Occur.SHOULD);
+                queryBuilder.add(subQuery, BooleanClause.Occur.SHOULD);
 
-                ret = query;
+                ret = queryBuilder.build();
             }
         }
 
@@ -1637,7 +1639,7 @@ public class LucenePropertyIndex extends FulltextIndex {
 
     private static Query newDepthQuery(String path, PlanResult planResult) {
         int depth = PathUtils.getDepth(path) + planResult.getParentDepth() + 1;
-        return IntPoint.newRangeQuery(FieldNames.PATH_DEPTH, depth, depth, true, true);
+        return IntPoint.newRangeQuery(FieldNames.PATH_DEPTH, depth, depth);
     }
 
     @SuppressWarnings("Guava")
