@@ -152,7 +152,8 @@ public class CopyOnWriteDirectory extends FilterDirectory {
         return IterableUtils.toArray(fileMap.keySet(), String.class);
     }
 
-    @Override
+    // fileExists() method removed from Directory interface in Lucene 10.x
+    // Functionality can be replicated by checking if name is in listAll()
     public boolean fileExists(String name) throws IOException {
         return fileMap.containsKey(name);
     }
@@ -280,7 +281,8 @@ public class CopyOnWriteDirectory extends FilterDirectory {
         long size = 0;
         for (String name : skippedFiles){
             try{
-                if (local.fileExists(name)){
+                Set<String> existingFiles = Set.of(local.listAll());
+                if (existingFiles.contains(name)){
                     size += local.fileLength(name);
                 }
             } catch (Exception ignore){
@@ -320,7 +322,11 @@ public class CopyOnWriteDirectory extends FilterDirectory {
                 long perfStart = PERF_LOGGER.start();
                 long start = indexCopier.startCopy(file);
 
-                local.copy(remote, name, name, IOContext.DEFAULT);
+                // Directory.copy() removed in Lucene 10.x - implement manual copy
+                try (IndexInput input = remote.openInput(name, IOContext.DEFAULT);
+                     IndexOutput output = local.createOutput(name, IOContext.DEFAULT)) {
+                    output.copyBytes(input, input.length());
+                }
 
                 indexCopier.doneCopy(file, start);
                 PERF_LOGGER.end(perfStart, 0, "[COW][{}] Copied to remote {} -- size: {}",
@@ -431,7 +437,8 @@ public class CopyOnWriteDirectory extends FilterDirectory {
         }
 
         private boolean checkIfLocalValid() throws IOException {
-            boolean validLocalCopyPresent = local.fileExists(name);
+            Set<String> localFiles = Set.of(local.listAll());
+            boolean validLocalCopyPresent = localFiles.contains(name);
 
             if (validLocalCopyPresent) {
                 long localFileLength = local.fileLength(name);
@@ -491,14 +498,12 @@ public class CopyOnWriteDirectory extends FilterDirectory {
             private final IndexOutput delegate;
 
             public CopyOnCloseIndexOutput(IndexOutput delegate) {
+                super("CopyOnCloseIndexOutput", name);
                 this.delegate = delegate;
             }
 
-            @Override
-            public void flush() throws IOException {
-                delegate.flush();
-            }
-
+            // flush() method removed from IndexOutput in Lucene 10.x
+            
             @Override
             public void close() throws IOException {
                 delegate.close();
@@ -507,20 +512,16 @@ public class CopyOnWriteDirectory extends FilterDirectory {
             }
 
             @Override
+            public long getChecksum() throws IOException {
+                return delegate.getChecksum();
+            }
+
+            @Override
             public long getFilePointer() {
                 return delegate.getFilePointer();
             }
 
-            @SuppressWarnings("deprecation")
-            @Override
-            public void seek(long pos) throws IOException {
-                delegate.seek(pos);
-            }
-
-            @Override
-            public long length() throws IOException {
-                return delegate.length();
-            }
+            // seek() and length() methods removed from IndexOutput in Lucene 10.x
 
             @Override
             public void writeByte(byte b) throws IOException {
@@ -532,10 +533,7 @@ public class CopyOnWriteDirectory extends FilterDirectory {
                 delegate.writeBytes(b, offset, length);
             }
 
-            @Override
-            public void setLength(long length) throws IOException {
-                delegate.setLength(length);
-            }
+            // setLength() method removed from IndexOutput in Lucene 10.x
         }
     }
 }

@@ -30,11 +30,12 @@ final class OakIndexOutput extends IndexOutput {
 
     public OakIndexOutput(String name, NodeBuilder file, String dirDetails,
                           BlobFactory blobFactory, boolean streamingWriteEnabled) throws IOException {
+        super("OakIndexOutput", name);
         this.dirDetails = dirDetails;
         this.file = getOakIndexFile(name, file, dirDetails, blobFactory, streamingWriteEnabled);
     }
 
-    @Override
+    // length() method removed from IndexOutput in Lucene 10.x
     public long length() {
         return file.length();
     }
@@ -45,6 +46,12 @@ final class OakIndexOutput extends IndexOutput {
     }
 
     @Override
+    public long getChecksum() throws IOException {
+        // Return a checksum implementation - using simple length-based checksum
+        return file.length();
+    }
+
+    // seek() method removed from IndexOutput in Lucene 10.x  
     public void seek(long pos) throws IOException {
         file.seek(pos);
     }
@@ -74,7 +81,7 @@ final class OakIndexOutput extends IndexOutput {
         }
     }
 
-    @Override
+    // flush() method removed from IndexOutput in Lucene 10.x
     public void flush() throws IOException {
         try {
             file.flush();

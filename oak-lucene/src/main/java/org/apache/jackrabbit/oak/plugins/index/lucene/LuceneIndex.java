@@ -432,7 +432,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
                             TopDocs topDocs = searcher.search(query, 100);
                             if (topDocs.totalHits.value() > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
-                                    Document retrievedDoc = searcher.getDocument(doc.doc);
+                                    Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     if (filter.isAccessible(retrievedDoc.get(FieldNames.PATH))) {
                                         suggestedWords.add(suggestion.string);
                                         break;
@@ -455,7 +455,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
                             TopDocs topDocs = searcher.search(query, 100);
                             if (topDocs.totalHits.value() > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
-                                    Document retrievedDoc = searcher.getDocument(doc.doc);
+                                    Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     if (filter.isAccessible(retrievedDoc.get(FieldNames.PATH))) {
                                         suggestedWords.add("{term=" + suggestion.key + ",weight=" + suggestion.value + "}");
                                         break;

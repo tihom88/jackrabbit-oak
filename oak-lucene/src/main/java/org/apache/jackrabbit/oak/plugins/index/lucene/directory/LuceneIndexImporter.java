@@ -33,6 +33,8 @@ import org.apache.jackrabbit.oak.spi.state.NodeState;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
 
 import static org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexConstants.TYPE_LUCENE;
 
@@ -80,7 +82,7 @@ public class LuceneIndexImporter implements IndexImporterProvider {
     private void copyDirectory(LuceneIndexDefinition definition, NodeBuilder definitionBuilder, String jcrName, File dir)
             throws IOException {
         try (Closer closer = Closer.create()) {
-            Directory sourceDir = FSDirectory.open(dir);
+            Directory sourceDir = FSDirectory.open(dir.toPath());
             closer.register(sourceDir);
 
             //Remove any existing directory as in import case
@@ -93,7 +95,11 @@ public class LuceneIndexImporter implements IndexImporterProvider {
             closer.register(targetDir);
 
             for (String file : sourceDir.listAll()) {
-                sourceDir.copy(targetDir, file, file, IOContext.DEFAULT);
+                // Directory.copy() removed in Lucene 10.x - implement manual copy
+                try (IndexInput input = sourceDir.openInput(file, IOContext.DEFAULT);
+                     IndexOutput output = targetDir.createOutput(file, IOContext.DEFAULT)) {
+                    output.copyBytes(input, input.length());
+                }
             }
         }
     }

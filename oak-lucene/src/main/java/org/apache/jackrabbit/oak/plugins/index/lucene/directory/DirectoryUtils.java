@@ -22,6 +22,7 @@ package org.apache.jackrabbit.oak.plugins.index.lucene.directory;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.SegmentCommitInfo;
@@ -39,7 +40,8 @@ public class DirectoryUtils {
         try{
             //Check for file presence otherwise internally it results in
             //an exception to be created
-            if (dir.fileExists(fileName)) {
+            Set<String> existingFiles = Set.of(dir.listAll());
+            if (existingFiles.contains(fileName)) {
                 return dir.fileLength(fileName);
             }
         } catch (Exception ignore){
@@ -87,11 +89,11 @@ public class DirectoryUtils {
 
     public static int getNumDocs(Directory dir) throws IOException {
         int count = 0;
-        SegmentInfos sis = new SegmentInfos();
-        sis.read(dir);
+        // In Lucene 10.x, SegmentInfos.readLatestCommit() replaces constructor + read()
+        SegmentInfos sis = SegmentInfos.readLatestCommit(dir);
 
         for (SegmentCommitInfo sci : sis) {
-            count += sci.info.getDocCount() - sci.getDelCount();
+            count += sci.info.maxDoc() - sci.getDelCount();
         }
 
         return count;

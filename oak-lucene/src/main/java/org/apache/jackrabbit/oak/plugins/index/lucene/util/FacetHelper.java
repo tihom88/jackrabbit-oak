@@ -92,8 +92,9 @@ public class FacetHelper {
                 FacetsCollector facetsCollector = new FacetsCollector();
                 try {
                     DefaultSortedSetDocValuesReaderState state = new DefaultSortedSetDocValuesReaderState(
-                            searcher.getIndexReader(), FieldNames.createFacetFieldName(facetField));
-                    FacetsCollector.search(searcher, query, null,1, Sort.INDEXORDER, facetsCollector);
+                            searcher.getIndexReader(), FieldNames.createFacetFieldName(facetField), new FacetsConfig());
+                    // In Lucene 10.x, FacetsCollector.search() was removed - use searcher.search() with collector
+                    searcher.search(query, facetsCollector);
 
                     switch (secureFacetConfiguration.getMode()) {
                         case INSECURE:
@@ -132,6 +133,11 @@ public class FacetHelper {
 
         @Override
         public Number getSpecificValue(String dim, String... path) {
+            return null;
+        }
+
+        @Override
+        public FacetResult getAllChildren(String dim, String... path) {
             return null;
         }
 

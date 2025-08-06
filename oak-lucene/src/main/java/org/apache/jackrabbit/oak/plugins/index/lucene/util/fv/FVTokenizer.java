@@ -26,7 +26,11 @@ import org.apache.lucene.util.Version;
  */
 class FVTokenizer extends CharTokenizer {
     FVTokenizer(Version matchVersion, Reader input) {
-      super(matchVersion, input);
+      // Version parameter ignored in Lucene 10.x
+    }
+    
+    FVTokenizer() {
+      // Default constructor in Lucene 10.x
     }
 
     @Override

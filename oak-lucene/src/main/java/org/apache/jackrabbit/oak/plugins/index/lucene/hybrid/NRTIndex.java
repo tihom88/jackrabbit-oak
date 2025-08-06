@@ -221,7 +221,8 @@ public class NRTIndex implements Closeable {
                     indexWriter.deleteAll();
                 }
                 // don't merge, as anyway only keep two generations
-                indexWriter.close(false);
+                // In Lucene 10.x, close() no longer takes boolean parameter
+                indexWriter.close();
             }
             time = System.nanoTime() - time;
             if (time > 100_000_000) {
@@ -312,9 +313,9 @@ public class NRTIndex implements Closeable {
             //applyDeletes is false as layers above would take care of
             //stale result
             if (dirReader == null || dirReader.getRefCount() == 0) {
-                result = DirectoryReader.open(indexWriter, false);
+                result = DirectoryReader.open(indexWriter);
             } else {
-                DirectoryReader newReader = DirectoryReader.openIfChanged(dirReader, indexWriter, false);
+                DirectoryReader newReader = DirectoryReader.openIfChanged(dirReader, indexWriter);
                 if (newReader != null) {
                     result = newReader;
                 }

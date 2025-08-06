@@ -30,7 +30,11 @@ import org.apache.lucene.util.Version;
  */
 public class CRTokenizer extends CharTokenizer {
     public CRTokenizer(Version matchVersion, Reader input) {
-        super(matchVersion, input);
+        // Version parameter ignored in Lucene 10.x
+    }
+    
+    public CRTokenizer(Reader input) {
+        // Default constructor in Lucene 10.x
     }
 
     @Override

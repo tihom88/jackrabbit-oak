@@ -257,6 +257,12 @@ public class OakDirectory extends Directory {
     }
 
     @Override
+    public Set<String> getPendingDeletions() throws IOException {
+        // OakDirectory doesn't track pending deletions - return empty set
+        return Collections.emptySet();
+    }
+
+    @Override
     public void close() throws IOException {
         if (!readOnly && definition.saveDirListing()) {
             if (!fileNamesAtStart.equals(fileNames)) {

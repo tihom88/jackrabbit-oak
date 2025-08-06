@@ -93,8 +93,10 @@ import org.apache.lucene.facet.FacetResult;
 import org.apache.lucene.facet.Facets;
 import org.apache.lucene.facet.LabelAndValue;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.MultiFields;
 import org.apache.lucene.index.Term;
@@ -423,7 +425,14 @@ public class LucenePropertyIndex extends FulltextIndex {
                                 QueryScorer scorer = new QueryScorer(query);
                                 scorer.setExpandMultiTermQuery(true);
                                 highlighter.setFragmentScorer(scorer);
-                                mergedFieldInfos = MultiFields.getMergedFieldInfos(searcher.getIndexReader());
+                                // MultiFields.getMergedFieldInfos() removed in Lucene 10.x - collect from all leaves
+                                Map<String, FieldInfo> fieldInfoMap = new HashMap<>();
+                                for (LeafReaderContext leaf : searcher.getIndexReader().leaves()) {
+                                    for (FieldInfo fieldInfo : leaf.reader().getFieldInfos()) {
+                                        fieldInfoMap.put(fieldInfo.name, fieldInfo);
+                                    }
+                                }
+                                mergedFieldInfos = new FieldInfos(fieldInfoMap.values().toArray(new FieldInfo[0]));
                             }
 
                             boolean earlyStop = false;
@@ -502,7 +511,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                             TopDocs topDocs = searcher.search(query, 100);
                             if (topDocs.totalHits.value() > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
-                                    Document retrievedDoc = searcher.getDocument(doc.doc);
+                                    Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     String prefix = filter.getPath();
                                     if (prefix.length() == 1) {
                                         prefix = "";
@@ -534,7 +543,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                             TopDocs topDocs = searcher.search(query, 100);
                             if (topDocs.totalHits.value() > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
-                                    Document retrievedDoc = searcher.getDocument(doc.doc);
+                                    Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     String prefix = filter.getPath();
                                     if (prefix.length() == 1) {
                                         prefix = "";
@@ -608,13 +617,13 @@ public class LucenePropertyIndex extends FulltextIndex {
             if (!PathUtils.denotesRoot(path)) {
                 if (getPlanResult(plan).indexDefinition.evaluatePathRestrictions()) {
 
-                    BooleanQuery compositeQuery = new BooleanQuery();
-                    compositeQuery.add(query, BooleanClause.Occur.MUST);
+                    BooleanQuery.Builder compositeQueryBuilder = new BooleanQuery.Builder();
+                    compositeQueryBuilder.add(query, BooleanClause.Occur.MUST);
 
                     Query pathQuery = new TermQuery(newAncestorTerm(path));
-                    compositeQuery.add(pathQuery, BooleanClause.Occur.MUST);
+                    compositeQueryBuilder.add(pathQuery, BooleanClause.Occur.MUST);
 
-                    query = compositeQuery;
+                    query = compositeQueryBuilder.build();
                 } else {
                     LOG.warn("Descendant clause could not be added without path restrictions enabled. Plan: {}", plan);
                 }
@@ -653,7 +662,7 @@ public class LucenePropertyIndex extends FulltextIndex {
         int docID = doc.doc;
         List<String> names = new LinkedList<>();
 
-        for (IndexableField field : searcher.getIndexReader().document(docID).getFields()) {
+        for (IndexableField field : searcher.getIndexReader().storedFields().document(docID).getFields()) {
             String name = field.name();
             // postings highlighter can be used on analyzed fields with docs, freqs, positions and offsets stored.
             if (name.startsWith(FieldNames.ANALYZED_FIELD_PREFIX) && fieldInfos.hasProx() && fieldInfos.hasOffsets()) {
@@ -669,7 +678,7 @@ public class LucenePropertyIndex extends FulltextIndex {
             int[] maxPassages = new int[names.size()];
             Arrays.fill(maxPassages, 1);
             try {
-                UnifiedHighlighter uh = new UnifiedHighlighter(searcher, indexNode.getDefinition().getAnalyzer());
+                UnifiedHighlighter uh = new UnifiedHighlighter(searcher, analyzer);
                 Map<String, String[]> stringMap = uh.highlightFields(names.toArray(new String[names.size()]),
                         query, new int[]{docID}, maxPassages);
                 for (Map.Entry<String, String[]> entry : stringMap.entrySet()) {
@@ -688,7 +697,7 @@ public class LucenePropertyIndex extends FulltextIndex {
 
         // fallback if no excerpt could be retrieved using postings highlighter
         if (columnNameToExcerpts.size() == 0) {
-            for (IndexableField field : searcher.getIndexReader().document(doc.doc).getFields()) {
+            for (IndexableField field : searcher.getIndexReader().storedFields().document(doc.doc).getFields()) {
                 String name = field.name();
                 // only full text or analyzed fields
                 if (name.startsWith(FieldNames.FULLTEXT) || name.startsWith(FieldNames.ANALYZED_FIELD_PREFIX)) {
@@ -992,8 +1001,8 @@ public class LucenePropertyIndex extends FulltextIndex {
             if (q instanceof BooleanQuery) {
                 BooleanQuery ibq = (BooleanQuery) q;
                 boolean onlyNotClauses = true;
-                for (BooleanClause c : ibq.getClauses()) {
-                    if (c.getOccur() != BooleanClause.Occur.MUST_NOT) {
+                for (BooleanClause c : ibq.clauses()) {
+                    if (c.occur() != BooleanClause.Occur.MUST_NOT) {
                         onlyNotClauses = false;
                         break;
                     }
@@ -1002,22 +1011,28 @@ public class LucenePropertyIndex extends FulltextIndex {
                     // if we have only NOT CLAUSES we have to add a match all docs (*.*) for the
                     // query to work
                     // This check is needed now for Older version of lucene(Implementation in LuceneIndex.java)
-                    ibq.add(new MatchAllDocsQuery(), BooleanClause.Occur.SHOULD);
+                    BooleanQuery.Builder ibqBuilder = new BooleanQuery.Builder();
+                    for (BooleanClause clause : ibq.clauses()) {
+                        ibqBuilder.add(clause);
+                    }
+                    ibqBuilder.add(new MatchAllDocsQuery(), BooleanClause.Occur.SHOULD);
+                    qs.set(0, ibqBuilder.build());
                 }
             }
             return new LuceneRequestFacade<>(qs.get(0));
         }
-        BooleanQuery bq = new BooleanQuery();
+        BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
         for (Query q : qs) {
             boolean unwrapped = false;
             if (q instanceof BooleanQuery) {
-                unwrapped = unwrapMustNot((BooleanQuery) q, bq);
+                unwrapped = unwrapMustNot((BooleanQuery) q, bqBuilder);
             }
 
             if (!unwrapped) {
-                bq.add(q, MUST);
+                bqBuilder.add(q, MUST);
             }
         }
+        BooleanQuery bq = bqBuilder.build();
         return new LuceneRequestFacade<>(bq);
     }
 
@@ -1025,25 +1040,25 @@ public class LucenePropertyIndex extends FulltextIndex {
      * unwraps any NOT clauses from the provided boolean query into another boolean query.
      *
      * @param input  the query to be analysed for the existence of NOT clauses. Cannot be null.
-     * @param output the query where the unwrapped NOTs will be saved into. Cannot be null.
+     * @param output the query builder where the unwrapped NOTs will be saved into. Cannot be null.
      * @return true if there where at least one unwrapped NOT. false otherwise.
      */
-    private static boolean unwrapMustNot(@NotNull BooleanQuery input, @NotNull BooleanQuery output) {
+    private static boolean unwrapMustNot(@NotNull BooleanQuery input, @NotNull BooleanQuery.Builder output) {
         requireNonNull(input);
         requireNonNull(output);
         boolean unwrapped = false;
-        for (BooleanClause bc : input.getClauses()) {
-            if (bc.getOccur() == BooleanClause.Occur.MUST_NOT) {
-                output.add(bc);
+        for (BooleanClause bc : input.clauses()) {
+            if (bc.occur() == BooleanClause.Occur.MUST_NOT) {
+                output.add(bc.query(), bc.occur());
                 unwrapped = true;
             }
         }
         if (unwrapped) {
             // if we have unwrapped "must not" conditions,
             // then we need to unwrap "must" conditions as well
-            for (BooleanClause bc : input.getClauses()) {
-                if (bc.getOccur() == BooleanClause.Occur.MUST) {
-                    output.add(bc);
+            for (BooleanClause bc : input.clauses()) {
+                if (bc.occur() == BooleanClause.Occur.MUST) {
+                    output.add(bc.query(), bc.occur());
                 }
             }
         }
@@ -1082,10 +1097,10 @@ public class LucenePropertyIndex extends FulltextIndex {
                 break;
             case DIRECT_CHILDREN:
                 if (defn.evaluatePathRestrictions()) {
-                    BooleanQuery bq = new BooleanQuery();
-                    bq.add(new BooleanClause(new TermQuery(newAncestorTerm(path)), BooleanClause.Occur.MUST));
-                    bq.add(new BooleanClause(newDepthQuery(path, planResult), BooleanClause.Occur.MUST));
-                    qs.add(bq);
+                    BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
+                    bqBuilder.add(new TermQuery(newAncestorTerm(path)), BooleanClause.Occur.MUST);
+                    bqBuilder.add(newDepthQuery(path, planResult), BooleanClause.Occur.MUST);
+                    qs.add(bqBuilder.build());
                 }
                 break;
             case EXACT:
@@ -1220,32 +1235,36 @@ public class LucenePropertyIndex extends FulltextIndex {
                 if (pr.first != null && pr.first.equals(pr.last) && pr.firstIncluding
                         && pr.lastIncluding) {
                     // [property]=[value]
-                    return LongPoint.newRangeQuery(propertyName, first, first, true, true);
+                    return LongPoint.newRangeQuery(propertyName, first, first);
                 } else if (pr.first != null && pr.last != null) {
-                    return LongPoint.newRangeQuery(propertyName, first, last,
-                            pr.firstIncluding, pr.lastIncluding);
+                    // Handle inclusion/exclusion by adjusting bounds
+                    long adjustedFirst = pr.firstIncluding ? first : first + 1;
+                    long adjustedLast = pr.lastIncluding ? last : last - 1;
+                    return LongPoint.newRangeQuery(propertyName, adjustedFirst, adjustedLast);
                 } else if (pr.first != null && pr.last == null) {
                     // '>' & '>=' use cases
-                    return LongPoint.newRangeQuery(propertyName, first, null, pr.firstIncluding, true);
+                    long adjustedFirst = pr.firstIncluding ? first : first + 1;
+                    return LongPoint.newRangeQuery(propertyName, adjustedFirst, Long.MAX_VALUE);
                 } else if (pr.last != null && !pr.last.equals(pr.first)) {
                     // '<' & '<='
-                    return LongPoint.newRangeQuery(propertyName, null, last, true, pr.lastIncluding);
+                    long adjustedLast = pr.lastIncluding ? last : last - 1;
+                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, adjustedLast);
                 } else if (pr.list != null) {
-                    BooleanQuery in = new BooleanQuery();
+                    BooleanQuery.Builder inBuilder = new BooleanQuery.Builder();
                     for (PropertyValue value : pr.list) {
                         Long dateVal = FieldFactory.dateToLong(value.getValue(Type.DATE));
-                        in.add(LongPoint.newRangeQuery(propertyName, dateVal, dateVal, true, true), BooleanClause.Occur.SHOULD);
+                        inBuilder.add(LongPoint.newRangeQuery(propertyName, dateVal, dateVal), BooleanClause.Occur.SHOULD);
                     }
-                    return in;
+                    return inBuilder.build();
                 } else if (pr.isNotNullRestriction()) {
                     // not null. As we are indexing generic dates which can be beyond epoch. So using complete numeric range
-                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, Long.MAX_VALUE, true, true);
+                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, Long.MAX_VALUE);
                 } else if (pr.isNot && pr.not != null) {
                     // -[property]=[value]
-                    BooleanQuery bool = new BooleanQuery();
+                    BooleanQuery.Builder boolBuilder = new BooleanQuery.Builder();
                     // This will exclude entries with [property]=[value]
-                    bool.add(LongPoint.newRangeQuery(propertyName, not, not, true, true), MUST_NOT);
-                    return bool;
+                    boolBuilder.add(LongPoint.newRangeQuery(propertyName, not, not), MUST_NOT);
+                    return boolBuilder.build();
                 }
 
                 break;
@@ -1256,32 +1275,37 @@ public class LucenePropertyIndex extends FulltextIndex {
                 if (pr.first != null && pr.first.equals(pr.last) && pr.firstIncluding
                         && pr.lastIncluding) {
                     // [property]=[value]
-                    return DoublePoint.newRangeQuery(propertyName, first, first, true, true);
+                    return DoublePoint.newRangeQuery(propertyName, first, first);
                 } else if (pr.first != null && pr.last != null) {
-                    return DoublePoint.newRangeQuery(propertyName, first, last,
-                            pr.firstIncluding, pr.lastIncluding);
+                    // Handle inclusion/exclusion by adjusting bounds - for double, use small epsilon
+                    double epsilon = Math.ulp(Math.max(Math.abs(first), Math.abs(last)));
+                    double adjustedFirst = pr.firstIncluding ? first : first + epsilon;
+                    double adjustedLast = pr.lastIncluding ? last : last - epsilon;
+                    return DoublePoint.newRangeQuery(propertyName, adjustedFirst, adjustedLast);
                 } else if (pr.first != null && pr.last == null) {
                     // '>' & '>=' use cases
-                    return DoublePoint.newRangeQuery(propertyName, first, null, pr.firstIncluding, true);
+                    double adjustedFirst = pr.firstIncluding ? first : first + Math.ulp(first);
+                    return DoublePoint.newRangeQuery(propertyName, adjustedFirst, Double.MAX_VALUE);
                 } else if (pr.last != null && !pr.last.equals(pr.first)) {
                     // '<' & '<='
-                    return DoublePoint.newRangeQuery(propertyName, null, last, true, pr.lastIncluding);
+                    double adjustedLast = pr.lastIncluding ? last : last - Math.ulp(last);
+                    return DoublePoint.newRangeQuery(propertyName, -Double.MAX_VALUE, adjustedLast);
                 } else if (pr.list != null) {
-                    BooleanQuery in = new BooleanQuery();
+                    BooleanQuery.Builder inBuilder = new BooleanQuery.Builder();
                     for (PropertyValue value : pr.list) {
                         Double doubleVal = value.getValue(DOUBLE);
-                        in.add(DoublePoint.newRangeQuery(propertyName, doubleVal, doubleVal, true, true), BooleanClause.Occur.SHOULD);
+                        inBuilder.add(DoublePoint.newRangeQuery(propertyName, doubleVal, doubleVal), BooleanClause.Occur.SHOULD);
                     }
-                    return in;
+                    return inBuilder.build();
                 } else if (pr.isNotNullRestriction()) {
                     // not null.
-                    return DoublePoint.newRangeQuery(propertyName, Double.MIN_VALUE, Double.MAX_VALUE, true, true);
+                    return DoublePoint.newRangeQuery(propertyName, -Double.MAX_VALUE, Double.MAX_VALUE);
                 } else if (pr.isNot && pr.not != null) {
                     // -[property]=[value]
-                    BooleanQuery bool = new BooleanQuery();
+                    BooleanQuery.Builder boolBuilder = new BooleanQuery.Builder();
                     // This will exclude entries with [property]=[value]
-                    bool.add(DoublePoint.newRangeQuery(propertyName, pr.not.getValue(DOUBLE), pr.not.getValue(DOUBLE), true, true), MUST_NOT);
-                    return bool;
+                    boolBuilder.add(DoublePoint.newRangeQuery(propertyName, pr.not.getValue(DOUBLE), pr.not.getValue(DOUBLE)), MUST_NOT);
+                    return boolBuilder.build();
                 }
                 break;
             }
@@ -1291,32 +1315,36 @@ public class LucenePropertyIndex extends FulltextIndex {
                 if (pr.first != null && pr.first.equals(pr.last) && pr.firstIncluding
                         && pr.lastIncluding) {
                     // [property]=[value]
-                    return LongPoint.newRangeQuery(propertyName, first, first, true, true);
+                    return LongPoint.newRangeQuery(propertyName, first, first);
                 } else if (pr.first != null && pr.last != null) {
-                    return LongPoint.newRangeQuery(propertyName, first, last,
-                            pr.firstIncluding, pr.lastIncluding);
+                    // Handle inclusion/exclusion by adjusting bounds
+                    long adjustedFirst = pr.firstIncluding ? first : first + 1;
+                    long adjustedLast = pr.lastIncluding ? last : last - 1;
+                    return LongPoint.newRangeQuery(propertyName, adjustedFirst, adjustedLast);
                 } else if (pr.first != null && pr.last == null) {
                     // '>' & '>=' use cases
-                    return LongPoint.newRangeQuery(propertyName, first, null, pr.firstIncluding, true);
+                    long adjustedFirst = pr.firstIncluding ? first : first + 1;
+                    return LongPoint.newRangeQuery(propertyName, adjustedFirst, Long.MAX_VALUE);
                 } else if (pr.last != null && !pr.last.equals(pr.first)) {
                     // '<' & '<='
-                    return LongPoint.newRangeQuery(propertyName, null, last, true, pr.lastIncluding);
+                    long adjustedLast = pr.lastIncluding ? last : last - 1;
+                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, adjustedLast);
                 } else if (pr.list != null) {
-                    BooleanQuery in = new BooleanQuery();
+                    BooleanQuery.Builder inBuilder = new BooleanQuery.Builder();
                     for (PropertyValue value : pr.list) {
                         Long longVal = value.getValue(LONG);
-                        in.add(LongPoint.newRangeQuery(propertyName, longVal, longVal, true, true), BooleanClause.Occur.SHOULD);
+                        inBuilder.add(LongPoint.newRangeQuery(propertyName, longVal, longVal), BooleanClause.Occur.SHOULD);
                     }
-                    return in;
+                    return inBuilder.build();
                 } else if (pr.isNotNullRestriction()) {
                     // not null.
-                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, Long.MAX_VALUE, true, true);
+                    return LongPoint.newRangeQuery(propertyName, Long.MIN_VALUE, Long.MAX_VALUE);
                 } else if (pr.isNot && pr.not != null) {
                     // -[property]=[value]
-                    BooleanQuery bool = new BooleanQuery();
+                    BooleanQuery.Builder boolBuilder = new BooleanQuery.Builder();
                     // This will exclude entries with [property]=[value]
-                    bool.add(LongPoint.newRangeQuery(propertyName, pr.not.getValue(LONG), pr.not.getValue(LONG), true, true), MUST_NOT);
-                    return bool;
+                    boolBuilder.add(LongPoint.newRangeQuery(propertyName, pr.not.getValue(LONG), pr.not.getValue(LONG)), MUST_NOT);
+                    return boolBuilder.build();
                 }
                 break;
             }
@@ -1342,20 +1370,20 @@ public class LucenePropertyIndex extends FulltextIndex {
                     // '<' & '<='
                     return TermRangeQuery.newStringRange(propertyName, null, last, true, pr.lastIncluding);
                 } else if (pr.list != null) {
-                    BooleanQuery in = new BooleanQuery();
+                    BooleanQuery.Builder inBuilder = new BooleanQuery.Builder();
                     for (PropertyValue value : pr.list) {
                         String strVal = value.getValue(STRING);
-                        in.add(new TermQuery(new Term(propertyName, strVal)), BooleanClause.Occur.SHOULD);
+                        inBuilder.add(new TermQuery(new Term(propertyName, strVal)), BooleanClause.Occur.SHOULD);
                     }
-                    return in;
+                    return inBuilder.build();
                 } else if (pr.isNotNullRestriction()) {
                     return new TermRangeQuery(propertyName, null, null, true, true);
                 } else if (pr.isNot && pr.not != null) {
                     // -[property]=[value]
-                    BooleanQuery bool = new BooleanQuery();
+                    BooleanQuery.Builder boolBuilder = new BooleanQuery.Builder();
                     // This will exclude entries with [property]=[value]
-                    bool.add(new TermQuery(new Term(propertyName, pr.not.getValue(STRING))), MUST_NOT);
-                    return bool;
+                    boolBuilder.add(new TermQuery(new Term(propertyName, pr.not.getValue(STRING))), MUST_NOT);
+                    return boolBuilder.build();
                 }
             }
         }
@@ -1394,32 +1422,41 @@ public class LucenePropertyIndex extends FulltextIndex {
         }
 
         // reference query
-        BooleanQuery bq = new BooleanQuery();
-        Collection<String> fields = MultiFields.getIndexedFields(reader);
-        for (String f : fields) {
-            bq.add(new TermQuery(new Term(f, uuid)), SHOULD);
+        BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
+        // MultiFields.getIndexedFields() removed in Lucene 10.x - using alternative approach
+        Collection<String> fields = new ArrayList<>();
+        for (LeafReaderContext leaf : reader.leaves()) {
+            for (FieldInfo fieldInfo : leaf.reader().getFieldInfos()) {
+                if (fieldInfo.getIndexOptions() != IndexOptions.NONE) {
+                    fields.add(fieldInfo.name);
+                }
+            }
         }
-        qs.add(bq);
+        for (String f : fields) {
+            bqBuilder.add(new TermQuery(new Term(f, uuid)), SHOULD);
+        }
+        qs.add(bqBuilder.build());
     }
 
     private static void addNodeTypeConstraints(IndexingRule defn, List<Query> qs, Filter filter) {
-        BooleanQuery bq = new BooleanQuery();
+        BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
         PropertyDefinition primaryType = defn.getConfig(JCR_PRIMARYTYPE);
         //TODO OAK-2198 Add proper nodeType query support
 
         if (primaryType != null && primaryType.propertyIndex) {
             for (String type : filter.getPrimaryTypes()) {
-                bq.add(new TermQuery(new Term(JCR_PRIMARYTYPE, type)), SHOULD);
+                bqBuilder.add(new TermQuery(new Term(JCR_PRIMARYTYPE, type)), SHOULD);
             }
         }
 
         PropertyDefinition mixinType = defn.getConfig(JCR_MIXINTYPES);
         if (mixinType != null && mixinType.propertyIndex) {
             for (String type : filter.getMixinTypes()) {
-                bq.add(new TermQuery(new Term(JCR_MIXINTYPES, type)), SHOULD);
+                bqBuilder.add(new TermQuery(new Term(JCR_MIXINTYPES, type)), SHOULD);
             }
         }
 
+        BooleanQuery bq = bqBuilder.build();
         if (bq.clauses().size() != 0) {
             qs.add(bq);
         }

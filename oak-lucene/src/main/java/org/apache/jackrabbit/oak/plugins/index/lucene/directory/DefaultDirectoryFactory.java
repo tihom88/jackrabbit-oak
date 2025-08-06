@@ -115,7 +115,7 @@ public class DefaultDirectoryFactory implements DirectoryFactory {
             // etc. so instead of fixing these issues we'd better
             // work on making the in-content index work without
             // problems (or look at the Solr indexer as alternative)
-            return FSDirectory.open(file, NoLockFactory.INSTANCE);
+            return FSDirectory.open(file.toPath(), NoLockFactory.INSTANCE);
         }
     }
 }

@@ -53,6 +53,8 @@ import org.apache.lucene.index.CheckIndex;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.IOContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -299,7 +301,7 @@ public class IndexConsistencyChecker {
                                      File workDir, String dirName, Closer closer) throws IOException {
         File idxDir = createWorkDir(workDir, dirName);
         Directory sourceDir = new OakDirectory(new ReadOnlyBuilder(idx), dirName, defn, true);
-        Directory targetDir = FSDirectory.open(idxDir);
+        Directory targetDir = FSDirectory.open(idxDir.toPath());
 
         closer.register(sourceDir);
         closer.register(targetDir);
@@ -308,7 +310,11 @@ public class IndexConsistencyChecker {
         for (String file : sourceDir.listAll()) {
             log.debug("[{}][{}] Checking {}", indexPath, dirName, file);
             try {
-                sourceDir.copy(targetDir, file, file, IOContext.DEFAULT);
+                // Directory.copy() removed in Lucene 10.x - implement manual copy
+                try (IndexInput input = sourceDir.openInput(file, IOContext.DEFAULT);
+                     IndexOutput output = targetDir.createOutput(file, IOContext.DEFAULT)) {
+                    output.copyBytes(input, input.length());
+                }
             } catch (FileNotFoundException ignore){
                 dirStatus.missingFiles.add(file);
                 clean = false;
