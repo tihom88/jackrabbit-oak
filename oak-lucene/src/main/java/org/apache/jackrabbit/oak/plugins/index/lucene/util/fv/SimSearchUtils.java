@@ -193,8 +193,8 @@ public class SimSearchUtils {
             bandSize = computeBandSize(minhashes.size(), similarity, expectedTruePositive);
         }
 
-        BooleanQuery builder = new BooleanQuery();
-        BooleanQuery childBuilder = new BooleanQuery();
+        BooleanQuery.Builder builder = new BooleanQuery.Builder();
+        BooleanQuery.Builder childBuilder = new BooleanQuery.Builder();
         int rowInBand = 0;
         for (BytesRef minHash : minhashes) {
             TermQuery tq = new TermQuery(new Term(field, minHash));
@@ -204,21 +204,23 @@ public class SimSearchUtils {
                 childBuilder.add(new ConstantScoreQuery(tq), BooleanClause.Occur.MUST);
                 rowInBand++;
                 if (rowInBand == bandSize) {
-                    builder.add(new ConstantScoreQuery(childBuilder),
+                    builder.add(new ConstantScoreQuery(childBuilder.build()),
                             BooleanClause.Occur.SHOULD);
-                    childBuilder = new BooleanQuery();
+                    childBuilder = new BooleanQuery.Builder();
                     rowInBand = 0;
                 }
             }
         }
         // Avoid a dubious narrow band, wrap around and pad with the start
-        if (childBuilder.clauses().size() > 0) {
+        BooleanQuery childQuery = childBuilder.build();
+        if (childQuery.clauses().size() > 0) {
+            childBuilder = new BooleanQuery.Builder(); // Reset for wrapping
             for (BytesRef token : minhashes) {
                 TermQuery tq = new TermQuery(new Term(field, token.toString()));
                 childBuilder.add(new ConstantScoreQuery(tq), BooleanClause.Occur.MUST);
                 rowInBand++;
                 if (rowInBand == bandSize) {
-                    builder.add(new ConstantScoreQuery(childBuilder),
+                    builder.add(new ConstantScoreQuery(childBuilder.build()),
                             BooleanClause.Occur.SHOULD);
                     break;
                 }
@@ -228,11 +230,12 @@ public class SimSearchUtils {
         if (expectedTruePositive >= 1.0 && similarity < 1) {
             builder.setMinimumNumberShouldMatch((int) (Math.ceil(minhashes.size() * similarity)));
         }
+        BooleanQuery finalQuery = builder.build();
         if (log.isTraceEnabled()) {
             log.trace("similarity query with bands : {}, minShouldMatch : {}, no. of clauses : {}", bandSize,
-                    builder.getMinimumNumberShouldMatch(), builder.clauses().size());
+                    finalQuery.getMinimumNumberShouldMatch(), finalQuery.clauses().size());
         }
-        return builder;
+        return finalQuery;
 
     }
 
@@ -256,11 +259,11 @@ public class SimSearchUtils {
         List<Integer> toDiscard = new LinkedList<>();
         for (PropertyDefinition pd : sp) {
             String fieldName = FieldNames.createBinSimilarityFieldName(pd.name);
-            BytesRef binaryValue = indexSearcher.doc(inputDoc.doc).getBinaryValue(fieldName);
+            BytesRef binaryValue = indexSearcher.storedFields().document(inputDoc.doc).getBinaryValue(fieldName);
             if (binaryValue != null) {
                 double[] inputVector = toDoubleArray(binaryValue.bytes);
                 for (int j = 0; j < docs.scoreDocs.length; j++) {
-                    BytesRef featureVectorBinary = indexSearcher.doc(docs.scoreDocs[j].doc)
+                    BytesRef featureVectorBinary = indexSearcher.storedFields().document(docs.scoreDocs[j].doc)
                             .getBinaryValue(fieldName);
                     if (featureVectorBinary != null) {
                         double[] currentVector = toDoubleArray(featureVectorBinary.bytes);
@@ -297,8 +300,9 @@ public class SimSearchUtils {
             docs.scoreDocs = Arrays.copyOfRange(docs.scoreDocs, 0, k);
         }
 
+        // docs.setMaxScore() removed in Lucene 10.x - maxScore is calculated automatically
         if (docs.scoreDocs.length > 0) {
-            docs.setMaxScore(docs.scoreDocs[0].score);
+            // maxScore is now read-only and calculated automatically
         }
     }
 

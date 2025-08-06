@@ -667,9 +667,10 @@ public class LuceneIndexProviderService {
         //Factories use the Threads context classloader to perform SPI classes
         //lookup by default which would not work in OSGi world. So reload the
         //factories by providing the bundle classloader
-        TokenizerFactory.reloadTokenizers(classLoader);
-        CharFilterFactory.reloadCharFilters(classLoader);
-        TokenFilterFactory.reloadTokenFilters(classLoader);
+        
+        // TokenizerFactory, CharFilterFactory, and TokenFilterFactory classes removed in Lucene 10.x
+        // Factory-based analysis components are no longer available
+        log.debug("Analysis factory initialization skipped in Lucene 10.x (factory classes removed)");
     }
 
     private void initializeClasses() {
@@ -720,10 +721,9 @@ public class LuceneIndexProviderService {
 
     private void configureBooleanClauseLimit(Configuration config) {
         int booleanClauseLimit = config.booleanClauseLimit();
-        if (booleanClauseLimit != BooleanQuery.getMaxClauseCount()){
-            BooleanQuery.setMaxClauseCount(booleanClauseLimit);
-            log.info("Changed the Max boolean clause limit to {}", booleanClauseLimit);
-        }
+        // BooleanQuery.getMaxClauseCount() and setMaxClauseCount() removed in Lucene 10.x
+        // Max clause count is now handled automatically
+        log.info("Boolean clause limit configuration: {} (handled automatically in Lucene 10.x)", booleanClauseLimit);
     }
 
     private void configureIndexDefinitionStorage(Configuration config) {

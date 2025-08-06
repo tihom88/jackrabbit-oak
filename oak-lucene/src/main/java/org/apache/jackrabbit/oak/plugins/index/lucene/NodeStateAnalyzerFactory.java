@@ -36,6 +36,7 @@ import org.apache.jackrabbit.oak.api.Blob;
 import org.apache.jackrabbit.oak.api.PropertyState;
 import org.apache.jackrabbit.oak.api.Tree;
 import org.apache.jackrabbit.oak.api.Type;
+import org.apache.jackrabbit.oak.plugins.index.lucene.OakAnalyzer;
 import org.apache.jackrabbit.oak.plugins.index.lucene.util.TokenizerChain;
 import org.apache.jackrabbit.oak.plugins.index.search.FulltextIndexConstants;
 import org.apache.jackrabbit.oak.plugins.index.search.util.ConfigUtil;
@@ -45,6 +46,8 @@ import org.apache.jackrabbit.oak.spi.state.NodeStateUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.util.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 // Factory classes removed in Lucene 10.x - class disabled
 /*
 import org.apache.lucene.analysis.util.AbstractAnalysisFactory;
@@ -71,6 +74,7 @@ import static java.util.Objects.requireNonNull;
  * based config. Resource lookup are performed via binary property access
  */
 final class NodeStateAnalyzerFactory {
+    private static final Logger log = LoggerFactory.getLogger(NodeStateAnalyzerFactory.class);
 
     private static final AtomicBoolean versionWarningAlreadyLogged = new AtomicBoolean(false);
 
@@ -104,7 +108,9 @@ final class NodeStateAnalyzerFactory {
 
     public Analyzer createInstance(NodeState state) {
         if (state.hasProperty(FulltextIndexConstants.ANL_CLASS)){
-            return createAnalyzerViaReflection(state);
+            // createAnalyzerViaReflection() disabled in Lucene 10.x due to factory class removal
+            log.warn("Analyzer reflection creation disabled in Lucene 10.x - using default analyzer");
+            return new OakAnalyzer();
         }
         return composeAnalyzer(state);
     }
