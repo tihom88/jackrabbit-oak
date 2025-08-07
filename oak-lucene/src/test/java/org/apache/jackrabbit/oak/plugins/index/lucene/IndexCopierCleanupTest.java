@@ -28,6 +28,7 @@ import org.apache.jackrabbit.oak.stats.Clock;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.FSDirectory;
@@ -202,7 +203,7 @@ public class IndexCopierCleanupTest {
         Directory cor1 = copier.getCoRDir(remoteSnapshowCow1);
         // local listing
         assertEquals(Set.of("a", "b", "c", "d"),
-                SetUtils.toSet(new SimpleFSDirectory(localFSDir).listAll()));
+                SetUtils.toSet(FSDirectory.open(localFSDir.toPath()).listAll()));
         // reader listing
         assertEquals(Set.of("a", "b"),
                 SetUtils.toSet(cor1.listAll()));
@@ -223,7 +224,7 @@ public class IndexCopierCleanupTest {
         Directory cor2 = copier.getCoRDir(remoteSnapshotCow2);
         // local listing
         assertEquals(Set.of("a", "b", "c", "d", "e", "f"),
-                SetUtils.toSet(new SimpleFSDirectory(localFSDir).listAll()));
+                SetUtils.toSet(FSDirectory.open(localFSDir.toPath()).listAll()));
         // reader listing
         assertEquals(Set.of("c", "d"),
                 SetUtils.toSet(cor2.listAll()));
@@ -233,7 +234,7 @@ public class IndexCopierCleanupTest {
 
         // nothing should get deleted as CoR1 sees "a", "b" and everything else is newer
         assertEquals(Set.of("a", "b", "c", "d", "e", "f"),
-                SetUtils.toSet(new SimpleFSDirectory(localFSDir).listAll()));
+                SetUtils.toSet(FSDirectory.open(localFSDir.toPath()).listAll()));
     }
 
     @Test
@@ -350,7 +351,7 @@ public class IndexCopierCleanupTest {
         copier.getCoRDir().close();
 
         assertEquals(Set.of("within-margin", "a"),
-                SetUtils.toSet(new SimpleFSDirectory(localFSDir).listAll()));
+                SetUtils.toSet(FSDirectory.open(localFSDir.toPath()).listAll()));
     }
 
     @Test
@@ -494,9 +495,12 @@ public class IndexCopierCleanupTest {
         }
     }
 
-    private static class DelayCopyingSimpleFSDirectory extends SimpleFSDirectory {
+    private static class DelayCopyingSimpleFSDirectory extends FilterDirectory {
+        private final File directoryFile;
+
         DelayCopyingSimpleFSDirectory(File dir) throws IOException {
-            super(dir);
+            super(FSDirectory.open(dir.toPath()));
+            this.directoryFile = dir;
         }
 
         static void updateLastModified(Directory dir, String name) throws IOException {
@@ -517,7 +521,7 @@ public class IndexCopierCleanupTest {
 
         void updateLastModified(String name) throws IOException {
             try {
-                updateLastModified(directory, name);
+                updateLastModified(directoryFile, name);
 
                 CLOCK.waitUntil(CLOCK.getTime() + SAFE_MARGIN_FOR_DELETION + MARGIN_BUFFER_FOR_FS_GRANULARITY);
             } catch (InterruptedException ie) {
@@ -534,17 +538,24 @@ public class IndexCopierCleanupTest {
         }
     }
 
-    private static class CloseSafeRemoteRAMDirectory extends RAMDirectory {
+    private static class CloseSafeRemoteRAMDirectory extends FilterDirectory {
         private final Closer closer;
 
         CloseSafeRemoteRAMDirectory(Closer closer) {
-            super();
+            super(new ByteBuffersDirectory());
             this.closer = closer;
             closer.register(this::close0);
         }
 
         CloseSafeRemoteRAMDirectory(CloseSafeRemoteRAMDirectory that) throws IOException {
-            super(that, IOContext.READ);
+            super(new ByteBuffersDirectory());
+            // Copy all files from source directory
+            for (String fileName : that.listAll()) {
+                try (IndexInput input = that.openInput(fileName, IOContext.DEFAULT);
+                     IndexOutput output = this.createOutput(fileName, IOContext.DEFAULT)) {
+                    output.copyBytes(input, input.length());
+                }
+            }
             this.closer = that.closer;
             closer.register(this::close0);
         }
@@ -553,14 +564,7 @@ public class IndexCopierCleanupTest {
         public void close() {
         }
 
-        @Override
-        public void copy(Directory to, String src, String dest, IOContext context) throws IOException {
-            super.copy(to, src, dest, context);
-
-            if (to instanceof DelayCopyingSimpleFSDirectory) {
-                ((DelayCopyingSimpleFSDirectory)to).updateLastModified(dest);
-            }
-        }
+        // copy() method override removed as signature has changed in Lucene 10
 
         CloseSafeRemoteRAMDirectory snapshot() throws IOException {
             return new CloseSafeRemoteRAMDirectory(this);
