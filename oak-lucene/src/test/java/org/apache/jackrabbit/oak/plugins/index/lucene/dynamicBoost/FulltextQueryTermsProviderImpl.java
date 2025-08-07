@@ -64,7 +64,7 @@ public class FulltextQueryTermsProviderImpl implements FulltextQueryTermsProvide
         }
 
         LOG.debug("getQueryTerm Text: {}", text);
-        BooleanQuery query = this.createQuery();
+        BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
 
         Set<String> charTerms = new HashSet<String>(splitForSearch(text));
         LOG.debug("getQueryTerm charTerms: {}", charTerms);
@@ -77,18 +77,17 @@ public class FulltextQueryTermsProviderImpl implements FulltextQueryTermsProvide
 
         for(String fragment : fragments) {
             Term term = new Term(PREDICTED_TAGS_REL_PATH + fragment.toLowerCase(), "1");
-            query.add(new TermQuery(term), BooleanClause.Occur.SHOULD);
+            queryBuilder.add(new TermQuery(term), BooleanClause.Occur.SHOULD);
             LOG.debug("Added query term: {}", fragment.toLowerCase());
         }
 
 
         Term term = new Term(PREDICTED_TAGS_REL_PATH + text.toLowerCase(), "1");
-        query.add(new TermQuery(term), BooleanClause.Occur.SHOULD);
+        queryBuilder.add(new TermQuery(term), BooleanClause.Occur.SHOULD);
         LOG.debug("Added query term: {}", text.toLowerCase());
 
-        //De-boosting smart tags based query.
-        query.setBoost(0.0001f);
-        return query;
+        //De-boosting smart tags based query. Note: boost is now typically handled differently in Lucene 10
+        return queryBuilder.build();
 
     }
 
@@ -148,7 +147,7 @@ public class FulltextQueryTermsProviderImpl implements FulltextQueryTermsProvide
     }
 
     protected BooleanQuery createQuery() {
-        return new BooleanQuery();
+        return new BooleanQuery.Builder().build();
     }
 
 }

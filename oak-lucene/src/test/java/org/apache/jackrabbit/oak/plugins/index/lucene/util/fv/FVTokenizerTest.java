@@ -34,7 +34,9 @@ public class FVTokenizerTest {
 
   @Test
   public void testTokenizeWithSpaces() throws Exception {
-      TokenStream stream = new FVTokenizer(Version.LUCENE_47, new StringReader("0.10 0.20 0.30 0.40"));
+      FVTokenizer tokenizer = new FVTokenizer();
+      tokenizer.setReader(new StringReader("0.10 0.20 0.30 0.40"));
+      TokenStream stream = tokenizer;
       stream.reset();
       List<String> expectedTokens = new LinkedList<>();
       expectedTokens.add("0.10");
@@ -53,7 +55,9 @@ public class FVTokenizerTest {
 
   @Test
   public void testTokenizeWithCommas() throws Exception {
-      TokenStream stream = new FVTokenizer(Version.LUCENE_47, new StringReader("0.10,0.20,0.30,0.40"));
+      FVTokenizer tokenizer = new FVTokenizer();
+      tokenizer.setReader(new StringReader("0.10,0.20,0.30,0.40"));
+      TokenStream stream = tokenizer;
       stream.reset();
       List<String> expectedTokens = new LinkedList<>();
       expectedTokens.add("0.10");
@@ -72,7 +76,9 @@ public class FVTokenizerTest {
 
   @Test
   public void testTokenizeWithCommasAndSpaces() throws Exception {
-      TokenStream stream = new FVTokenizer(Version.LUCENE_47, new StringReader("0.10, 0.20, 0.30, 0.40"));
+      FVTokenizer tokenizer = new FVTokenizer();
+      tokenizer.setReader(new StringReader("0.10, 0.20, 0.30, 0.40"));
+      TokenStream stream = tokenizer;
       stream.reset();
       List<String> expectedTokens = new LinkedList<>();
       expectedTokens.add("0.10");
