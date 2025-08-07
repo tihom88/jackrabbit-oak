@@ -12,10 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-org.apache.lucene.codecs.lucene40.Lucene40Codec
-org.apache.lucene.codecs.lucene41.Lucene41Codec
-org.apache.lucene.codecs.lucene42.Lucene42Codec
-org.apache.lucene.codecs.lucene45.Lucene45Codec
-org.apache.lucene.codecs.lucene46.Lucene46Codec
+# Note: Old Lucene 4.x codecs (Lucene40Codec, Lucene41Codec, etc.) have been removed in Lucene 9.x
+# Only include codecs that are available in Lucene 9.12.2
 org.apache.jackrabbit.oak.plugins.index.lucene.OakCodec
 org.apache.jackrabbit.oak.plugins.index.lucene.util.CompressingCodec
