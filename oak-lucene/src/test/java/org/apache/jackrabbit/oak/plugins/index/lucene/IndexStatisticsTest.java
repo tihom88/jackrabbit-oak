@@ -184,7 +184,7 @@ public class IndexStatisticsTest {
     }
 
     private static IndexWriter getWriter(Directory d) throws IOException {
-        IndexWriterConfig config = new IndexWriterConfig(VERSION, LuceneIndexConstants.ANALYZER);
+        IndexWriterConfig config = new IndexWriterConfig(LuceneIndexConstants.ANALYZER);
         return new IndexWriter(d, config);
     }
 

@@ -38,10 +38,10 @@ import org.apache.lucene.analysis.core.LowerCaseTokenizer;
 import org.apache.lucene.analysis.core.StopFilterFactory;
 import org.apache.lucene.analysis.core.WhitespaceTokenizerFactory;
 import org.apache.lucene.analysis.path.PathHierarchyTokenizerFactory;
-import org.apache.lucene.analysis.util.CharArraySet;
-import org.apache.lucene.analysis.util.ClasspathResourceLoader;
-import org.apache.lucene.analysis.util.StopwordAnalyzerBase;
-import org.apache.lucene.util.Version;
+import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.StopwordAnalyzerBase;
+// import org.apache.lucene.analysis.util.ClasspathResourceLoader; // TODO: Check if still available in Lucene 10
+// import org.apache.lucene.util.Version; // Removed in Lucene 10
 import org.junit.Test;
 
 import static org.apache.jackrabbit.JcrConstants.JCR_CONTENT;
@@ -206,21 +206,20 @@ public class NodeStateAnalyzerFactoryTest {
     }
 
     public static class TestAnalyzer extends StopwordAnalyzerBase{
-        final Version matchVersion;
-
-        public TestAnalyzer(Version matchVersion) {
-            super(matchVersion);
-            this.matchVersion = matchVersion;
+        // Note: Version parameter removed in Lucene 10
+        
+        public TestAnalyzer() {
+            super();
         }
 
-        public TestAnalyzer(Version version, CharArraySet stopwords) {
-            super(version, stopwords);
-            this.matchVersion = version;
+        public TestAnalyzer(CharArraySet stopwords) {
+            super(stopwords);
         }
 
         @Override
-        protected TokenStreamComponents createComponents(final String fieldName, final Reader reader) {
-            return new TokenStreamComponents(new LowerCaseTokenizer(matchVersion, reader));
+        protected TokenStreamComponents createComponents(final String fieldName) {
+            LowerCaseTokenizer tokenizer = new LowerCaseTokenizer();
+            return new TokenStreamComponents(tokenizer);
         }
     }
 
