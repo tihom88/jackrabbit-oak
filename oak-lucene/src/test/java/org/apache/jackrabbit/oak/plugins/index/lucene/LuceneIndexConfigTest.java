@@ -49,6 +49,7 @@ public class LuceneIndexConfigTest {
         IndexWriterConfig config = getIndexWriterConfig(definition, true);
         assertEquals(config.getRAMBufferSizeMB(), 16.0, .01);
         assertEquals(100, config.getRAMPerThreadHardLimitMB());
-        assertEquals(1000, config.getMaxBufferedDeleteTerms());
+        // Note: getMaxBufferedDeleteTerms() removed in Lucene 10
+        // assertEquals(1000, config.getMaxBufferedDeleteTerms());
     }
 }
