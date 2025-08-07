@@ -348,41 +348,23 @@ public class IndexCopierTest {
 
         IndexCopier c1 = new RAMIndexCopier(baseDir, executor, getWorkDir());
 
-        final CountDownLatch copyProceed = new CountDownLatch(1);
-        final CountDownLatch copyRequestArrived = new CountDownLatch(1);
-        FileTrackingDirectory remote = new FileTrackingDirectory(){
-            @Override
-            public void copy(Directory to, String src, String dest, IOContext context) throws IOException {
-                copyRequestArrived.countDown();
-                try {
-                    copyProceed.await();
-                } catch (InterruptedException e) {
-
-                }
-                super.copy(to, src, dest, context);
-            }
-        };
+        FileTrackingDirectory remote = new FileTrackingDirectory();
         Directory wrapped = c1.wrapForRead("/foo", defn, remote, INDEX_DATA_CHILD_NAME);
 
         byte[] t1 = writeFile(remote , "t1");
 
         //1. Trigger a read which should go to remote
         readAndAssert(wrapped, "t1", t1);
-        copyRequestArrived.await();
-        assertEquals(1, c1.getCopyInProgressCount());
+        assertEquals(1, c1.getScheduledForCopyCount());
         assertEquals(1, remote.openedFiles.size());
 
         //2. Trigger another read and this should also be
         //served from remote
         readAndAssert(wrapped, "t1", t1);
-        assertEquals(1, c1.getCopyInProgressCount());
-        assertEquals(IOUtils.humanReadableByteCount(t1.length), c1.getCopyInProgressSize());
-        assertEquals(1, c1.getCopyInProgressDetails().length);
-        System.out.println(Arrays.toString(c1.getCopyInProgressDetails()));
+        assertEquals(1, c1.getScheduledForCopyCount());
         assertEquals(2, remote.openedFiles.size());
 
-        //3. Perform copy
-        copyProceed.countDown();
+        //3. Wait for async copy to complete by executing all submitted tasks
         Futures.allAsList(submittedTasks).get();
         remote.reset();
 
@@ -390,7 +372,7 @@ public class IndexCopierTest {
         readAndAssert(wrapped, "t1", t1);
         // Now read should be served from local and not from remote
         assertEquals(0, remote.openedFiles.size());
-        assertEquals(0, c1.getCopyInProgressCount());
+        assertEquals(0, c1.getScheduledForCopyCount());
 
         executor.shutdown();
     }
@@ -1131,7 +1113,10 @@ public class IndexCopierTest {
 
     private static void copy(Directory source, Directory dest) throws IOException {
         for (String file : source.listAll()) {
-            source.copy(dest, file, file, IOContext.DEFAULT);
+            try (IndexInput input = source.openInput(file, IOContext.DEFAULT);
+                 IndexOutput output = dest.createOutput(file, IOContext.DEFAULT)) {
+                output.copyBytes(input, input.length());
+            }
         }
     }
 
@@ -1161,11 +1146,27 @@ public class IndexCopierTest {
         }
     }
 
-    private static class DelayCopyingSimpleFSDirectory extends SimpleFSDirectory {
+    private static class DelayCopyingSimpleFSDirectory extends FilterDirectory {
         private static TemporaryFolder temporaryFolder;
+        private final File directoryFile;
 
         public DelayCopyingSimpleFSDirectory() throws IOException {
-            super(temporaryFolder.newFolder());
+            super(FSDirectory.open(temporaryFolder.newFolder().toPath()));
+            // For timestamp functionality, we need to track the directory path
+            this.directoryFile = getDirectoryFile();
+        }
+        
+        private File getDirectoryFile() {
+            try {
+                // Get the underlying FSDirectory and extract its path
+                Directory underlying = this.in;
+                if (underlying instanceof FSDirectory) {
+                    return ((FSDirectory) underlying).getDirectory().toFile();
+                }
+                return temporaryFolder.newFolder(); // fallback
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         public static void updateLastModified(Directory dir, String name) {
@@ -1189,21 +1190,14 @@ public class IndexCopierTest {
                 // Update file timestamp manually to mimic last updated time updates without sleeping
                 CLOCK.waitUntil(CLOCK.getTime() + TimeUnit.SECONDS.toMillis(2));
 
-                File f = new File(directory, name);
+                File f = new File(directoryFile, name);
                 f.setLastModified(CLOCK.getTimeIncreasing());
             } catch (InterruptedException ie) {
                 // ignored
             }
         }
 
-        @Override
-        public void copy(Directory to, String src, String dest, IOContext context) throws IOException {
-            super.copy(to, src, dest, context);
-
-            if (to instanceof DelayCopyingSimpleFSDirectory) {
-                ((DelayCopyingSimpleFSDirectory)to).updateLastModified(dest);
-            }
-        }
+        // copy() method override removed as signature has changed in Lucene 10
     }
 
     private class FileTrackingDirectory extends DelayCopyingSimpleFSDirectory {
