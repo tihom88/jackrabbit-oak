@@ -440,7 +440,8 @@ public class IndexCopierTest {
         LuceneIndexDefinition defn = new LuceneIndexDefinition(root, builder.getNodeState(), "/foo");
         RAMIndexCopier c1 = new RAMIndexCopier(baseDir, newDirectExecutorService(), getWorkDir());
 
-        Directory remote = new ByteBuffersDirectory(){
+        ByteBuffersDirectory remoteDelegate = new ByteBuffersDirectory();
+        Directory remote = new FilterDirectory(remoteDelegate){
             @Override
             public IndexInput openInput(String name, IOContext context) throws IOException {
                 throw new IllegalStateException("boom");
@@ -742,7 +743,8 @@ public class IndexCopierTest {
         IndexCopier copier = new RAMIndexCopier(baseDir, newDirectExecutorService(), getWorkDir());
 
         final Set<String> readRemotes = new HashSet<>();
-        Directory remote = new ByteBuffersDirectory() {
+        ByteBuffersDirectory remoteDelegate2 = new ByteBuffersDirectory();
+        Directory remote = new FilterDirectory(remoteDelegate2) {
             @Override
             public IndexInput openInput(String name, IOContext context) throws IOException {
                 readRemotes.add(name);
