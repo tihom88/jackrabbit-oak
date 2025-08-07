@@ -94,9 +94,15 @@ public class IndexFieldProviderImpl implements IndexFieldProvider {
             ft.freeze();
         }
     
+        private final float boost;
+        
         AugmentedField(String name, double weight) {
             super(name, "1", ft);
-            setBoost((float) weight);
+            this.boost = (float) weight;
+        }
+        
+        public float getBoost() {
+            return boost;
         }
     }
 
