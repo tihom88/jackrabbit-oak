@@ -146,7 +146,7 @@ public class SimSearchUtils {
                 IndexSearcher searcher = new IndexSearcher(reader);
                 TermQuery q = new TermQuery(new Term(FieldNames.PATH, text));
                 TopDocs top = searcher.search(q, 1);
-                if (top.totalHits.value() > 0) {
+                if (top.totalHits.value > 0) {
                     ScoreDoc d = top.scoreDocs[0];
                     Document doc = reader.storedFields().document(d.doc);
                     for (PropertyDefinition pd : sp) {

@@ -621,7 +621,7 @@ public class LuceneIndexMBeanImpl extends AnnotatedStandardMBean implements Luce
         while(depth < maxLevel){
             //Confirm if we have any hit at current depth
             TopDocs docs = searcher.search(newDepthQuery(depth), 1);
-            if (docs.totalHits.value() != 0){
+            if (docs.totalHits.value != 0){
                 return depth;
             }
             depth++;

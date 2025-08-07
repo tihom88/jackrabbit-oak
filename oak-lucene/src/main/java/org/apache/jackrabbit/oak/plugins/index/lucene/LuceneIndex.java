@@ -435,7 +435,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
                         for (SuggestWord suggestion : suggestWords) {
                             Query query = qp.createPhraseQuery(FieldNames.SUGGEST, suggestion.string);
                             TopDocs topDocs = searcher.search(query, 100);
-                            if (topDocs.totalHits.value() > 0) {
+                            if (topDocs.totalHits.value > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
                                     Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     if (filter.isAccessible(retrievedDoc.get(FieldNames.PATH))) {
@@ -458,7 +458,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
                         for (Lookup.LookupResult suggestion : lookupResults) {
                             Query query = qp.createPhraseQuery(FieldNames.FULLTEXT, suggestion.key.toString());
                             TopDocs topDocs = searcher.search(query, 100);
-                            if (topDocs.totalHits.value() > 0) {
+                            if (topDocs.totalHits.value > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
                                     Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     if (filter.isAccessible(retrievedDoc.get(FieldNames.PATH))) {

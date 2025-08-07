@@ -511,7 +511,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                             query = addDescendantClauseIfRequired(query, plan);
 
                             TopDocs topDocs = searcher.search(query, 100);
-                            if (topDocs.totalHits.value() > 0) {
+                            if (topDocs.totalHits.value > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
                                     Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     String prefix = filter.getPath();
@@ -543,7 +543,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                             query = addDescendantClauseIfRequired(query, plan);
 
                             TopDocs topDocs = searcher.search(query, 100);
-                            if (topDocs.totalHits.value() > 0) {
+                            if (topDocs.totalHits.value > 0) {
                                 for (ScoreDoc doc : topDocs.scoreDocs) {
                                     Document retrievedDoc = searcher.storedFields().document(doc.doc);
                                     String prefix = filter.getPath();

@@ -83,7 +83,7 @@ public class MoreLikeThisHelper {
                     IndexSearcher searcher = new IndexSearcher(reader);
                     TermQuery q = new TermQuery(new Term(FieldNames.PATH, text));
                     TopDocs top = searcher.search(q, 1);
-                    if (top.totalHits.value() == 0) {
+                    if (top.totalHits.value == 0) {
                         mlt.setFieldNames(fields);
                         moreLikeThisQuery = mlt.like(mlt.getFieldNames()[0], new StringReader(text));
                     } else{
