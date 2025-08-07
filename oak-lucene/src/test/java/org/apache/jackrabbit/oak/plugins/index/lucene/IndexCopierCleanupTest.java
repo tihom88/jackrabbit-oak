@@ -571,7 +571,11 @@ public class IndexCopierCleanupTest {
         }
 
         private void close0() {
-            super.close();
+            try {
+                super.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }
