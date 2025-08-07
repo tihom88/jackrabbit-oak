@@ -1009,7 +1009,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                 BooleanQuery ibq = (BooleanQuery) q;
                 boolean onlyNotClauses = true;
                 for (BooleanClause c : ibq.clauses()) {
-                    if (c.occur() != BooleanClause.Occur.MUST_NOT) {
+                    if (c.getOccur() != BooleanClause.Occur.MUST_NOT) {
                         onlyNotClauses = false;
                         break;
                     }
@@ -1055,8 +1055,8 @@ public class LucenePropertyIndex extends FulltextIndex {
         requireNonNull(output);
         boolean unwrapped = false;
         for (BooleanClause bc : input.clauses()) {
-            if (bc.occur() == BooleanClause.Occur.MUST_NOT) {
-                output.add(bc.query(), bc.occur());
+            if (bc.getOccur() == BooleanClause.Occur.MUST_NOT) {
+                output.add(bc.getQuery(), bc.getOccur());
                 unwrapped = true;
             }
         }
@@ -1064,8 +1064,8 @@ public class LucenePropertyIndex extends FulltextIndex {
             // if we have unwrapped "must not" conditions,
             // then we need to unwrap "must" conditions as well
             for (BooleanClause bc : input.clauses()) {
-                if (bc.occur() == BooleanClause.Occur.MUST) {
-                    output.add(bc.query(), bc.occur());
+                if (bc.getOccur() == BooleanClause.Occur.MUST) {
+                    output.add(bc.getQuery(), bc.getOccur());
                 }
             }
         }
@@ -1504,7 +1504,7 @@ public class LucenePropertyIndex extends FulltextIndex {
                     if (x instanceof BooleanQuery) {
                         BooleanQuery bq = (BooleanQuery) x;
                         if ((bq.clauses().size() == 1) &&
-                                (bq.clauses().get(0).occur() == BooleanClause.Occur.MUST_NOT)) {
+                                (bq.clauses().get(0).getOccur() == BooleanClause.Occur.MUST_NOT)) {
                             hasMustNot = true;
                             qBuilder.add(bq.clauses().get(0));
                         }

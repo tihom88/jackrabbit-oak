@@ -944,7 +944,7 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
                     if (x instanceof BooleanQuery) {
                         BooleanQuery bq = (BooleanQuery) x;
                         if ((bq.clauses().size() == 1) &&
-                            (bq.clauses().get(0).occur() == Occur.MUST_NOT)) {
+                            (bq.clauses().get(0).getOccur() == Occur.MUST_NOT)) {
                             hasMustNot = true;
                             qBuilder.add(bq.clauses().get(0));
                         }

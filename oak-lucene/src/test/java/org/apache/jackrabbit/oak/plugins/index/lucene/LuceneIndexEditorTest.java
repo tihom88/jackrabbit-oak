@@ -550,8 +550,8 @@ public class LuceneIndexEditorTest {
 
     private String getPath(Query query) throws IOException {
         TopDocs td = getSearcher().search(query, 100);
-        if (td.totalHits.value() > 0){
-            if(td.totalHits.value() > 1){
+        if (td.totalHits.value > 0){
+            if(td.totalHits.value > 1){
                 fail("More than 1 result found for query " + query);
             }
             return getSearcher().getIndexReader().storedFields().document(td.scoreDocs[0].doc).get(FieldNames.PATH);
