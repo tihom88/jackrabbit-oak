@@ -35,8 +35,9 @@ public class FeaturePositionTokenFilterTest {
 
     @Test
     public void testFiltering() throws Exception {
-        TokenStream stream = new WhitespaceTokenizer(null, new StringReader("0.10 0.20 0.30 0.40"));
-        FeaturePositionTokenFilter filter = new FeaturePositionTokenFilter(stream);
+        WhitespaceTokenizer tokenizer = new WhitespaceTokenizer();
+        tokenizer.setReader(new StringReader("0.10 0.20 0.30 0.40"));
+        FeaturePositionTokenFilter filter = new FeaturePositionTokenFilter(tokenizer);
         filter.reset();
         List<String> expectedTokens = new LinkedList<>();
         expectedTokens.add("1_0.10");

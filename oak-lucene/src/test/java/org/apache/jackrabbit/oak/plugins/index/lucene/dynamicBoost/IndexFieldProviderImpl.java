@@ -87,11 +87,10 @@ public class IndexFieldProviderImpl implements IndexFieldProvider {
     private static class AugmentedField extends Field {
         private static final FieldType ft = new FieldType();
         static {
-            ft.setIndexed(true);
             ft.setStored(false);
             ft.setTokenized(false);
             ft.setOmitNorms(false);
-            ft.setIndexOptions(org.apache.lucene.index.FieldInfo.IndexOptions.DOCS_ONLY);
+            ft.setIndexOptions(org.apache.lucene.index.IndexOptions.DOCS);
             ft.freeze();
         }
     

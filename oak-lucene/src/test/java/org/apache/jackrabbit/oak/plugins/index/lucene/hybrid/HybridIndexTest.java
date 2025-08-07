@@ -90,7 +90,7 @@ import org.apache.jackrabbit.oak.stats.StatisticsProvider;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.lucene.store.NoLockFactory;
-import org.apache.lucene.store.SimpleFSDirectory;
+import org.apache.lucene.store.FSDirectory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.After;
@@ -386,7 +386,7 @@ public class HybridIndexTest extends AbstractQueryTest {
         nrtIndexFactory.setDirectoryFactory(new NRTDirectoryFactory() {
             @Override
             public Directory createNRTDir(IndexDefinition definition, File indexDir) throws IOException {
-                Directory fsdir = new SimpleFSDirectory(indexDir, NoLockFactory.getNoLockFactory());
+                Directory fsdir = FSDirectory.open(indexDir.toPath());
                 //TODO make these configurable
                 return new NRTCachingDirectory(fsdir, 0.001, 0.001);
             }
