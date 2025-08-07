@@ -63,7 +63,7 @@ public class BufferedOakDirectoryTest {
 
         // must not be visible yet in base
         Directory base = createDir(builder, false);
-        assertFalse(base.fileExists("file"));
+        assertFalse(Arrays.asList(base.listAll()).contains("file"));
         base.close();
 
         buffered.close();
@@ -173,7 +173,7 @@ public class BufferedOakDirectoryTest {
             IndexOutput multiBlobIndexOutput = multiBlobDir.createOutput("foo", IOContext.DEFAULT);
 
             multiBlobIndexOutput.writeBytes(randomBytes(100), 0, 100);
-            multiBlobIndexOutput.flush();
+            multiBlobIndexOutput.close();
         }
 
         PropertyState jcrData = builder.getChildNode(":data").getChildNode("foo").getProperty("jcr:data");
@@ -184,7 +184,7 @@ public class BufferedOakDirectoryTest {
             IndexOutput multiBlobIndexOutput = multiBlobDir.createOutput("foo", IOContext.DEFAULT);
 
             multiBlobIndexOutput.writeBytes(randomBytes(100), 0, 100);
-            multiBlobIndexOutput.flush();
+            multiBlobIndexOutput.close();
         }
 
         jcrData = builder.getChildNode(":data").getChildNode("foo").getProperty("jcr:data");
@@ -194,7 +194,7 @@ public class BufferedOakDirectoryTest {
             IndexOutput multiBlobIndexOutput = multiBlobDir.createOutput("foo", IOContext.DEFAULT);
 
             multiBlobIndexOutput.writeBytes(randomBytes(100), 0, 100);
-            multiBlobIndexOutput.flush();
+            multiBlobIndexOutput.close();
         }
 
         jcrData = builder.getChildNode(":data").getChildNode("foo").getProperty("jcr:data");
@@ -212,7 +212,7 @@ public class BufferedOakDirectoryTest {
             IndexOutput multiBlobIndexOutput = multiBlobDir.createOutput("foo", IOContext.DEFAULT);
 
             multiBlobIndexOutput.writeBytes(randomBytes(100), 0, 100);
-            multiBlobIndexOutput.flush();
+            multiBlobIndexOutput.close();
         }
 
         // Enable feature... reader shouldn't care about the flag.
@@ -237,7 +237,7 @@ public class BufferedOakDirectoryTest {
             IndexOutput multiBlobIndexOutput = multiBlobDir.createOutput("foo", IOContext.DEFAULT);
 
             multiBlobIndexOutput.writeBytes(randomBytes(100), 0, 100);
-            multiBlobIndexOutput.flush();
+            multiBlobIndexOutput.close();
         }
 
         // Enable feature... reader shouldn't care about the flag.
@@ -396,7 +396,7 @@ public class BufferedOakDirectoryTest {
 
     private void assertFile(Directory dir, String file, byte[] expected)
             throws IOException {
-        assertTrue(dir.fileExists(file));
+        assertTrue(Arrays.asList(dir.listAll()).contains(file));
         assertEquals(expected.length, dir.fileLength(file));
         IndexInput in = dir.openInput(file, IOContext.DEFAULT);
         byte[] data = new byte[expected.length];

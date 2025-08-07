@@ -81,7 +81,8 @@ public class ConcurrentCopyOnReadDirectoryTest {
         System.setProperty(WAIT_OTHER_COPY_SYSPROP_NAME, String.valueOf(TimeUnit.MILLISECONDS.toMillis(30)));
 
         // normal remote directory
-        remote = new RAMDirectory() {
+        ByteBuffersDirectory delegate = new ByteBuffersDirectory();
+        remote = new FilterDirectory(delegate) {
             @Override
             public IndexInput openInput(String name, IOContext context) throws IOException {
                 IndexInput ret = spy(super.openInput(name, context));
@@ -94,7 +95,7 @@ public class ConcurrentCopyOnReadDirectoryTest {
         output.writeString("foo");
         output.close();
 
-        IndexInput remoteInput = remote.openInput("file", IOContext.READ);
+        IndexInput remoteInput = remote.openInput("file", IOContext.DEFAULT);
         assertTrue(remoteInput.length() > 1);
 
         copier = new IndexCopier(newDirectExecutorService(), temporaryFolder.newFolder(), true);
@@ -125,7 +126,7 @@ public class ConcurrentCopyOnReadDirectoryTest {
         waitForLeechingCoRsToFinish();
 
         for (Directory d : IterableUtils.chainedIterable(Collections.singleton(firstCoR), leechingCoRs)) {
-            IndexInput input = d.openInput("file", IOContext.READ);
+            IndexInput input = d.openInput("file", IOContext.DEFAULT);
             assertFalse(d + " must not be reading from remote",
                     input.toString().startsWith(REMOTE_INPUT_PREFIX));
         }
@@ -144,12 +145,12 @@ public class ConcurrentCopyOnReadDirectoryTest {
 
         assertNull("First CoR must not throw exception", firstCoRFutre.get());
 
-        IndexInput input = firstCoR.openInput("file", IOContext.READ);
+        IndexInput input = firstCoR.openInput("file", IOContext.DEFAULT);
         assertFalse(firstCoR + " must not be reading from remote",
                 input.toString().startsWith(REMOTE_INPUT_PREFIX));
 
         for (Directory d : leechingCoRs) {
-            input = d.openInput("file", IOContext.READ);
+            input = d.openInput("file", IOContext.DEFAULT);
             assertTrue(d + " must be reading from remote",
                     input.toString().startsWith(REMOTE_INPUT_PREFIX));
         }
