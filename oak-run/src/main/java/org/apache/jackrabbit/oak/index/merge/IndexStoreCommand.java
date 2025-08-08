@@ -84,9 +84,9 @@ public class IndexStoreCommand implements Command {
         if (file.getName().endsWith(".lz4")) {
             reader = IndexStoreUtils.createReader(file, new LZ4Compression());
         } else if (file.getName().endsWith(".gz")) {
-            reader = IndexStoreUtils.createReader(file, Compression.GZIP);
+            reader = IndexStoreUtils.createReader(file, org.apache.jackrabbit.oak.commons.Compression.GZIP);
         } else {
-            reader = IndexStoreUtils.createReader(file, Compression.NONE);
+            reader = IndexStoreUtils.createReader(file, org.apache.jackrabbit.oak.commons.Compression.NONE);
         }
         while (true) {
             String line = reader.readLine();
