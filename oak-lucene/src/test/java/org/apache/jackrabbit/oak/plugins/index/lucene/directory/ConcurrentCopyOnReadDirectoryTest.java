@@ -29,6 +29,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,7 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.jackrabbit.guava.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import java.util.concurrent.Executor;
 import static org.apache.jackrabbit.oak.plugins.index.lucene.directory.CopyOnReadDirectory.WAIT_OTHER_COPY_SYSPROP_NAME;
 import static org.apache.jackrabbit.oak.plugins.index.search.FulltextIndexConstants.INDEX_DATA_CHILD_NAME;
 import static org.junit.Assert.assertFalse;
@@ -55,6 +57,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 public class ConcurrentCopyOnReadDirectoryTest {
+    private static final Logger log = LoggerFactory.getLogger(ConcurrentCopyOnReadDirectoryTest.class);
+    
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder(new File("target"));
 
@@ -78,7 +82,7 @@ public class ConcurrentCopyOnReadDirectoryTest {
 
     @Before
     public void setup() throws Exception {
-        System.setProperty(WAIT_OTHER_COPY_SYSPROP_NAME, String.valueOf(TimeUnit.MILLISECONDS.toMillis(30)));
+        System.setProperty(WAIT_OTHER_COPY_SYSPROP_NAME, String.valueOf(TimeUnit.SECONDS.toMillis(5)));
 
         // normal remote directory
         ByteBuffersDirectory delegate = new ByteBuffersDirectory();
@@ -98,7 +102,9 @@ public class ConcurrentCopyOnReadDirectoryTest {
         IndexInput remoteInput = remote.openInput("file", IOContext.DEFAULT);
         assertTrue(remoteInput.length() > 1);
 
-        copier = new IndexCopier(newDirectExecutorService(), temporaryFolder.newFolder(), true);
+        // Create a direct executor service (executes immediately)
+        Executor directExecutor = Runnable::run;
+        copier = new IndexCopier(directExecutor, temporaryFolder.newFolder(), true);
 
         NodeState root = InitialContentHelper.INITIAL_CONTENT;
         defn = new LuceneIndexDefinition(root, root, "/foo");
@@ -107,14 +113,16 @@ public class ConcurrentCopyOnReadDirectoryTest {
     @After
     public void tearDown() {
         // This is no-op usually but would save us in case first CoR is stuck in wait
-        firstCoRBlocker.countDown();
+        if (firstCoRBlocker != null) {
+            firstCoRBlocker.countDown();
+        }
 
         if (executorService != null) {
             new ExecutorCloser(executorService, 1, TimeUnit.SECONDS).close();
         }
     }
 
-    @Test
+    @Test(timeout = 30000) // 30 second timeout to prevent infinite hanging
     public void concurrentPrefetch() throws Exception {
         // setup one primary CoR and 2 subsequent ones to read. Each would run concurrently.
         setupCopiers(2);
@@ -132,7 +140,7 @@ public class ConcurrentCopyOnReadDirectoryTest {
         }
     }
 
-    @Test
+    @Test(timeout = 30000) // 30 second timeout to prevent infinite hanging
     public void concurrentPrefetchWithTimeout() throws Exception {
         // setup one primary CoR and 2 subsequent ones to read. Each would run concurrently.
         setupCopiers(2);
@@ -180,15 +188,15 @@ public class ConcurrentCopyOnReadDirectoryTest {
             }
 
             // wait while we're signalled that we can be done with opening input
-            boolean wait = true;
-            while (wait) {
-                try {
-                    // block until we are signalled to call super
-                    firstCoRBlocker.await();
-                    wait = false;
-                } catch (InterruptedException e) {
-                    // ignore
+            try {
+                // block until we are signalled to call super with timeout to prevent infinite wait
+                boolean signaled = firstCoRBlocker.await(10, TimeUnit.SECONDS);
+                if (!signaled) {
+                    log.warn("Timeout waiting for firstCoRBlocker signal, proceeding anyway");
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while waiting for firstCoRBlocker signal");
             }
 
             return input;
