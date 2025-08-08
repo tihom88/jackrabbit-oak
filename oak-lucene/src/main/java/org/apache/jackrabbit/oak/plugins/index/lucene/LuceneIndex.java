@@ -92,6 +92,9 @@ import org.apache.lucene.search.TotalHitCountCollector;
 import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.search.highlight.Fragmenter;
+import org.apache.lucene.search.highlight.Scorer;
 import org.apache.lucene.search.highlight.QueryScorer;
 import org.apache.lucene.search.highlight.SimpleHTMLEncoder;
 import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
@@ -179,8 +182,26 @@ public class LuceneIndex implements AdvanceFulltextQueryIndex {
 
     private final NodeAggregator aggregator;
 
+    // Use a default no-op scorer - will be replaced by QueryScorer when needed
     private final Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter("<strong>", "</strong>"),
-            new SimpleHTMLEncoder(), null);
+            new SimpleHTMLEncoder(), new Scorer() {
+                @Override
+                public TokenStream init(TokenStream tokenStream) {
+                    return tokenStream;
+                }
+                @Override
+                public float getTokenScore() {
+                    return 0;
+                }
+                @Override
+                public float getFragmentScore() {
+                    return 0;
+                }
+                @Override
+                public void startFragment(TextFragment newFragment) {
+                    // no-op
+                }
+            });
 
     public LuceneIndex(IndexTracker tracker, NodeAggregator aggregator) {
         this.tracker = tracker;
