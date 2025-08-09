@@ -19,7 +19,6 @@
 
 package org.apache.jackrabbit.oak.console.commands
 
-import org.apache.jackrabbit.guava.common.base.Stopwatch
 import org.apache.jackrabbit.oak.commons.PathUtils
 import org.apache.jackrabbit.oak.console.ConsoleSession
 import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexDefinition
@@ -81,7 +80,7 @@ class LuceneCommand extends ComplexCommandSupport {
         }
         try {
             File destDir = new File(destPath)
-            Stopwatch w = Stopwatch.createStarted()
+            long startTime = System.currentTimeMillis()
             io.out.println("Copying Lucene indexes to [${destDir.absolutePath}]")
             Directory dest = FSDirectory.open(destDir)
             long size = 0

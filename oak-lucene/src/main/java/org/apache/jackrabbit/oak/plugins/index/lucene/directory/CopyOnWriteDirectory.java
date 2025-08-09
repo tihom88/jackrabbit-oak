@@ -165,6 +165,10 @@ public class CopyOnWriteDirectory extends FilterDirectory {
         if (ref != null) {
             ref.delete();
         }
+        
+        // Mark as deleted to prevent copy operations
+        deletedFilesLocal.add(name);
+        skippedFiles.add(name);
     }
 
     @Override
@@ -184,6 +188,13 @@ public class CopyOnWriteDirectory extends FilterDirectory {
         }
         ref = new COWLocalFileReference(name);
         fileMap.put(name, ref);
+        
+        // Check if this is a temporary file that should not be copied
+        if (name.contains(".tmp") || name.endsWith(".pending") || name.contains("_Lucene90FieldsIndex-doc_ids_")) {
+            log.trace("[COW][{}] Created temporary file {}, will not schedule for copy", indexPath, name);
+            skippedFiles.add(name);
+        }
+        
         return ref.createOutput(context);
     }
 
@@ -317,15 +328,36 @@ public class CopyOnWriteDirectory extends FilterDirectory {
                     log.trace("[COW][{}] Skip copying of deleted file {}", indexPath, name);
                     return null;
                 }
+                
+                // Check if file still exists before attempting copy (files may be temporary)
+                try {
+                    String[] localFiles = local.listAll();
+                    if (!Arrays.asList(localFiles).contains(name)) {
+                        log.debug("[COW][{}] Skipping copy of non-existent local file {}", indexPath, name);
+                        skippedFiles.add(name);
+                        return null;
+                    }
+                } catch (IOException e) {
+                    log.warn("[COW][{}] Error checking local files for {}, skipping copy: {}", indexPath, name, e.getMessage());
+                    skippedFiles.add(name);
+                    return null;
+                }
+                
                 long fileSize = local.fileLength(name);
                 LocalIndexFile file = new LocalIndexFile(local, name, fileSize, false);
                 long perfStart = PERF_LOGGER.start();
                 long start = indexCopier.startCopy(file);
 
                 // Directory.copy() removed in Lucene 10.x - implement manual copy
+                // Add safety check before opening files
                 try (IndexInput input = remote.openInput(name, IOContext.DEFAULT);
                      IndexOutput output = local.createOutput(name, IOContext.DEFAULT)) {
                     output.copyBytes(input, input.length());
+                } catch (FileNotFoundException e) {
+                    log.warn("[COW][{}] File {} not found during copy, likely a temporary file: {}", indexPath, name, e.getMessage());
+                    skippedFiles.add(name);
+                    indexCopier.doneCopy(file, start);
+                    return null;
                 }
 
                 indexCopier.doneCopy(file, start);
