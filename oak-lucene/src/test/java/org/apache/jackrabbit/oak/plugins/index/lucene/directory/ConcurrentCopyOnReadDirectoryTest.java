@@ -233,7 +233,9 @@ public class ConcurrentCopyOnReadDirectoryTest {
         }
 
         // wait for leeching CoRs to start
-        leechingCoRsWaiter.await();
+        if (!leechingCoRsWaiter.await(15, TimeUnit.SECONDS)) {
+            log.warn("Timeout waiting for leeching CoRs to start");
+        }
     }
 
     private String createLeechingCoR(IndexCopier blockingCopier, LuceneIndexDefinition defn, String threadName) {
